@@ -39,6 +39,8 @@ final class PetSettings: ObservableObject {
     @Published var reactToMedia: Bool { didSet { d.set(reactToMedia, forKey: "reactToMedia") } }
     @Published var breakReminders: Bool { didSet { d.set(breakReminders, forKey: "breakReminders") } }
     @Published var systemAware: Bool { didSet { d.set(systemAware, forKey: "systemAware") } }
+    /// Mirrors the system's login item (not stored here: macOS owns it).
+    @Published var launchAtLogin = LoginItem.enabled
 
     private init() {
         species = Species(rawValue: d.string(forKey: "species") ?? "") ?? .mochi

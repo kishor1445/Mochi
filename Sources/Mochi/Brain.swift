@@ -19,11 +19,14 @@ enum PetAction: Equatable {
     case zoomies               // sprint back and forth
     case climbEdge             // walk to the nearest screen edge on purpose and climb it
     case dizzy                 // spiral eyes after the cursor is shaken at it
+    case mope                  // sits there looking sad (hungry or lonely)
 }
 
 struct Decision {
     let action: PetAction
     let duration: TimeInterval
+    /// Something to say while starting the action (optional).
+    var line: String? = nil
 }
 
 /// Everything the brain is allowed to know about the world.
@@ -37,21 +40,41 @@ struct PetContext {
     let canClimb: Bool                 // on the Dock floor with climbing enabled
     let media: MediaActivity           // what is playing on the Mac
     let userAway: Bool                 // nobody has touched the Mac for a while
+    let focusing: Bool                 // a focus session is running: keep calm
+    let species: Species
+    let energy: Double                 // 0...1, the pet's needs (see PetMind)
+    let fullness: Double
+    let joy: Double
+    let bondLevel: Int
 }
 
 /// The seam for future AI: anything that can pick the next Decision.
-/// Today: `RuleBrain`. Later: an `LLMBrain` that calls a model.
+/// Today: `MindBrain`. Later: an `LLMBrain` that calls a model.
 protocol Brain {
     func nextDecision(_ ctx: PetContext) -> Decision
 }
 
-/// Weighted-random behavior, no AI.
-struct RuleBrain: Brain {
+/// Needs-driven behavior, no AI. What the pet does depends on what is going on around it
+/// (music, calls, focus), how it feels (tired, hungry, lonely, joyful) and its species' personality.
+final class MindBrain: Brain {
+    private var lastNeedLine = Date.distantPast
+
     func nextDecision(_ ctx: PetContext) -> Decision {
         if ctx.userAway { return Decision(action: .sleep, duration: 30) }
 
+        let p = ctx.species.personality
         let late = ctx.hour >= 23 || ctx.hour < 6
-        let sleepy = ctx.secondsSinceInteraction > 180 || late
+        let drowsy = ctx.secondsSinceInteraction > 180 || late
+        let tired = ctx.energy < 0.25
+        let hungry = ctx.fullness < 0.2
+        let lonely = ctx.joy < 0.25
+        let joyful = ctx.joy > 0.7
+        let quiet = ctx.media == .call || ctx.focusing
+
+        // Running on empty: nothing else matters until it has had a nap.
+        if ctx.energy < 0.08 {
+            return Decision(action: .sleep, duration: .random(in: 40...80), line: needLine(Dialogue.sleepy, quiet: quiet))
+        }
 
         var axis: CGFloat = Bool.random() ? 1 : -1
         if ctx.axisFraction < 0.12 { axis = 1 }
@@ -62,43 +85,72 @@ struct RuleBrain: Brain {
         }
         var o: [(Double, Decision)] = []
 
-        switch ctx.media {
-        case .call:
-            // On a call: stay quiet and still.
+        if quiet {
+            // On a call or in a focus session: stay quiet and mostly still.
             o = [(10, d(.idle, 4, 8)), (2, d(.lookAround, 2, 3))]
-            if sleepy { o.append((2, d(.sleep, 10, 20))) }
+            if ctx.focusing { o.append((2, d(.walk(axis: axis), 2, 4))) }
+            if drowsy || tired { o.append((3, d(.sleep, 10, 20))) }
+        } else {
+            switch ctx.media {
+            case .video:
+                // Watching along.
+                o = [(9, d(.idle, 5, 10)), (2, d(.lookAround, 2, 3)), (1, d(.stretch, 2, 3))]
+                if drowsy || tired { o.append((3, d(.sleep, 10, 20))) }
 
-        case .video:
-            // Watching along.
-            o = [(9, d(.idle, 5, 10)), (2, d(.lookAround, 2, 3)), (1, d(.stretch, 2, 3))]
-            if sleepy { o.append((3, d(.sleep, 10, 20))) }
+            case .music, .other:
+                let fan: Double = ctx.media == .music ? 9 : 4
+                o = [(fan, d(.dance, 6, 10)), (3, d(.idle, 2, 4)), (4, d(.walk(axis: axis), 2, 6)),
+                     (2, d(.happy, 1.5, 2)), (1.5, d(.spin, 0.9, 0.9)), (1, d(.zoomies, 3, 4))]
+                if ctx.cursorDistance < 500 { o.append((2, d(.chase, 3, 6))) }
+                if tired { o.append((2, d(.sleep, 10, 20))) }
 
-        case .music, .other:
-            let fan: Double = ctx.media == .music ? 9 : 4
-            o = [(fan, d(.dance, 6, 10)), (3, d(.idle, 2, 4)), (4, d(.walk(axis: axis), 2, 6)),
-                 (2, d(.happy, 1.5, 2)), (1.5, d(.spin, 0.9, 0.9)), (1, d(.zoomies, 3, 4))]
-            if ctx.cursorDistance < 500 { o.append((2, d(.chase, 3, 6))) }
-
-        case .none:
-            if ctx.surface == .floor || ctx.surface == .air {
-                o = [(6, d(.idle, 2, 5)), (10, d(.walk(axis: axis), 2, 7)), (1.5, d(.happy, 1.5, 1.5)),
-                     (2, d(.stretch, 2.4, 2.4)), (1.5, d(.spin, 0.9, 0.9)), (1.5, d(.dance, 4, 4)),
-                     (2.5, d(.lookAround, 3, 3)), (1.5, d(.zoomies, 3.5, 3.5))]
-            } else {
-                // Clinging to an edge: it's mostly busy climbing around.
-                o = [(3, d(.idle, 2, 4)), (14, d(.walk(axis: axis), 3, 9)), (1.5, d(.lookAround, 2, 3)),
-                     (1, d(.happy, 1.5, 1.5)), (1, d(.stretch, 2.4, 2.4))]
+            case .none, .call:
+                if ctx.surface == .floor || ctx.surface == .air {
+                    o = [(6, d(.idle, 2, 5)), (10, d(.walk(axis: axis), 2, 7)), (1.5, d(.happy, 1.5, 1.5)),
+                         (2, d(.stretch, 2.4, 2.4)), (1.5, d(.spin, 0.9, 0.9)), (1.5, d(.dance, 4, 4)),
+                         (2.5, d(.lookAround, 3, 3)), (1.5, d(.zoomies, 3.5, 3.5))]
+                } else {
+                    // Clinging to an edge: it's mostly busy climbing around.
+                    o = [(3, d(.idle, 2, 4)), (14, d(.walk(axis: axis), 3, 9)), (1.5, d(.lookAround, 2, 3)),
+                         (1, d(.happy, 1.5, 1.5)), (1, d(.stretch, 2.4, 2.4))]
+                }
+                if ctx.cursorDistance < 500 { o.append((4, d(.chase, 3, 6))) }
+                if drowsy { o.append((6, d(.sleep, 8, 20))) } else if tired { o.append((3, d(.sleep, 15, 30))) }
             }
-            if ctx.cursorDistance < 500 { o.append((4, d(.chase, 3, 6))) }
-            if sleepy { o.append((6, d(.sleep, 8, 20))) }
+
+            if ctx.platformAbove && ctx.surface == .floor {
+                o.append((3, Decision(action: .leap, duration: 2)))
+            }
+            if ctx.canClimb && ctx.media != .video {
+                o.append((3.5, d(.climbEdge, 10, 14)))
+            }
+            // Unmet needs: sit and sulk, and now and then say what's wrong.
+            if hungry || lonely {
+                let lines = hungry ? Dialogue.hungry(ctx.species) : Dialogue.lonely
+                o.append((5, Decision(action: .mope, duration: .random(in: 4...7), line: needLine(lines, quiet: false))))
+            }
         }
 
-        if ctx.platformAbove && ctx.surface == .floor && ctx.media != .call {
-            o.append((3, Decision(action: .leap, duration: 2)))
+        // Feelings and personality tilt the odds.
+        func factor(_ a: PetAction) -> Double {
+            switch a {
+            case .sleep:
+                return p.sleepy * (tired ? 4 : 1) * (ctx.energy > 0.8 && !late ? 0.4 : 1)
+            case .dance, .zoomies, .spin:
+                return p.playful * (joyful ? 1.6 : 1) * (tired ? 0.2 : 1) * (lonely || hungry ? 0.4 : 1)
+            case .happy:
+                return joyful ? 1.8 : (lonely || hungry ? 0.3 : 1)
+            case .chase:
+                return p.cuddly * (lonely ? 2 : 1) * (tired ? 0.4 : 1) * (ctx.bondLevel >= 3 ? 1.3 : 1)
+            case .lookAround, .climbEdge, .leap:
+                return p.curious * (tired ? 0.4 : 1)
+            case .walk:
+                return tired ? 0.5 : 1
+            default:
+                return 1
+            }
         }
-        if ctx.canClimb && ctx.media != .call && ctx.media != .video {
-            o.append((3.5, d(.climbEdge, 10, 14)))
-        }
+        o = o.map { ($0.0 * factor($0.1.action), $0.1) }
 
         let total = o.reduce(0) { $0 + $1.0 }
         var roll = Double.random(in: 0..<total)
@@ -107,5 +159,13 @@ struct RuleBrain: Brain {
             if roll < 0 { return dec }
         }
         return o[0].1
+    }
+
+    /// A complaint, at most once every couple of minutes so it never nags.
+    private func needLine(_ lines: [String], quiet: Bool) -> String? {
+        let now = Date()
+        guard !quiet, now.timeIntervalSince(lastNeedLine) > 120 else { return nil }
+        lastNeedLine = now
+        return lines.randomElement()
     }
 }

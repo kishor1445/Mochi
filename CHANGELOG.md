@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.4.0
+
+- Pets have a brain now: energy, tummy and joy drift over time and steer what the pet does (naps when tired, sulks and asks for a snack when hungry, comes looking for you when lonely, extra bouncy when happy)
+- Each pet has its own personality (Mochi naps a lot, Miso explores, Clover plays, Pip is always hungry, Boo barely sleeps)
+- Bond: petting, treats, play and focus sessions grow your friendship through six levels; the pet remembers you between launches and misses you when you've been gone
+- New sad pose for when the pet needs something
+- Play ball: drop a toy and the pet chases it and kicks it around
+- Focus sessions (15 / 25 / 50 minutes): the pet keeps quiet, then celebrates with you
+- Launch at login (from the built Mochi.app)
+- The menu and the settings panel show how the pet is feeling
+
 ## 0.3.0
 
 - Miso the cat and Clover the bunny are back, so there are five pets to choose from

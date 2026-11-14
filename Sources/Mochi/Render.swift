@@ -3,7 +3,7 @@ import AppKit
 /// Developer helper: `Mochi --render <dir>` writes a contact sheet of every pet and mood to a PNG.
 enum Render {
     static func run(to path: String) {
-        let moods: [Mood] = [.idle, .walk, .happy, .sleep, .held, .dance, .stretch, .dizzy]
+        let moods: [Mood] = [.idle, .walk, .happy, .sleep, .held, .dance, .stretch, .dizzy, .sad]
         let cell = PetView.side
         let sheet = NSImage(size: NSSize(width: cell * CGFloat(moods.count), height: cell * CGFloat(Species.allCases.count + 2)))
         sheet.lockFocus()
@@ -50,7 +50,7 @@ import SwiftUI
 
 extension Render {
     static func settings(to path: String) {
-        let host = NSHostingView(rootView: SettingsView(settings: .shared, onSayHi: {}, onBringBack: {}, onTreat: {}))
+        let host = NSHostingView(rootView: SettingsView(settings: .shared, onSayHi: {}, onBringBack: {}, onTreat: {}, onPlay: {}))
         host.appearance = NSAppearance(named: .aqua)
         host.frame = NSRect(origin: .zero, size: host.fittingSize)
         let win = NSWindow(contentRect: host.frame, styleMask: [.titled], backing: .buffered, defer: false)

@@ -1,6 +1,6 @@
 import AppKit
 
-enum Mood { case idle, walk, sleep, happy, chase, held, jump, dance, stretch, dizzy }
+enum Mood { case idle, walk, sleep, happy, chase, held, jump, dance, stretch, dizzy, sad }
 
 struct Heart {
     var x: CGFloat
@@ -132,6 +132,7 @@ final class PetView: NSView {
         case .dance: lift = abs(sin(t * 8)) * 8; squash = 1 + 0.06 * sin(t * 16)
         case .stretch: squash = 1.18 + 0.07 * sin(t * 5)
         case .dizzy: squash = 1 + 0.03 * sin(t * 3)
+        case .sad:   squash = 0.94 + 0.015 * sin(t * 1.5)    // slumped
         case .idle:  break
         }
         // Bob to the beat while music plays.
@@ -305,6 +306,7 @@ final class PetView: NSView {
             case .happy, .dance: rot += sin(time * 9) * 0.12
             case .held:         rot += outward * 0.4
             case .dizzy:        rot += sin(time * 12 + u) * 0.25
+            case .sad:          rot = outward * 0.8
             default:            rot += sin(time * 1.5 + u * 3) * 0.03
             }
             let base = NSPoint(x: body.midX + u * body.width / 2, y: body.maxY - 5)
@@ -342,6 +344,7 @@ final class PetView: NSView {
             case .sleep: ang = side * 0.12
             case .dizzy: ang = side * (1.0 + sin(time * 12) * 0.3)
             case .idle: ang += sin(time * 2 + side) * 0.04
+            case .sad: ang = side * 0.1
             }
             let pivot = NSPoint(x: body.midX + side * (body.width / 2 - 3), y: body.minY + body.height * 0.56)
             drawLimb(ctx, pivot: pivot, size: NSSize(width: 12, height: 26), ang: ang)
@@ -421,13 +424,21 @@ final class PetView: NSView {
                 let wide = mood == .held
                 let ew: CGFloat = wide ? 7.5 : 6.4
                 let eh: CGFloat = blinking ? 1.5 : (wide ? 10 : 8.4)
-                let gx = wide ? 0 : gaze.x, gy = wide ? 0 : gaze.y
+                let sad = mood == .sad
+                let gx = wide ? 0 : (sad ? 0 : gaze.x), gy = wide ? 0 : (sad ? -2 : gaze.y)
                 let r = NSRect(x: ex - ew / 2 + gx, y: eyeY - eh / 2 + gy, width: ew, height: eh)
                 NSBezierPath(ovalIn: r).fill()
                 if !blinking {
                     NSColor.white.setFill()
                     NSBezierPath(ovalIn: NSRect(x: r.midX + 0.4, y: r.midY + eh * 0.12, width: 2.4, height: 2.4)).fill()
                     ink.setFill()
+                }
+                if sad {
+                    // worried brows, higher towards the middle
+                    let brow = NSBezierPath()
+                    brow.move(to: NSPoint(x: ex - dx * 4, y: eyeY + 10.5))
+                    brow.line(to: NSPoint(x: ex + dx * 4.5, y: eyeY + 7))
+                    brow.lineWidth = 1.8; brow.lineCapStyle = .round; brow.stroke()
                 }
             }
         }
@@ -439,6 +450,8 @@ final class PetView: NSView {
             if open {
                 ink.setFill()
                 NSBezierPath(ovalIn: NSRect(x: fx - 3, y: eyeY - 17, width: 6, height: 7)).fill()
+            } else if mood == .sad {
+                arc(NSPoint(x: fx, y: eyeY - 14), 3, 20, 160)
             } else {
                 arc(NSPoint(x: fx, y: eyeY - 9), 3, 200, 340)
             }

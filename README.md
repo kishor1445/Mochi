@@ -10,24 +10,33 @@ click, drag or ignore it.
 
 ![The three pets in different moods](docs/pets.png)
 
-There is no AI yet. Everything is rule-based, but the pet's decisions go through a single `Brain`
-interface, so a smarter (LLM-powered) brain can be plugged in later without touching the rest.
+Each pet has a little mind of its own: it gets tired, hungry and lonely, has its own personality, and
+grows closer to you the more you look after it. There is no AI model involved. Everything is rule-based
+and runs offline, but the pet's decisions go through a single `Brain` interface, so a smarter
+(LLM-powered) brain can be plugged in later without touching the rest.
 
 ## Pets
 
 | Pet | Personality |
 | --- | --- |
-| **Mochi** 🍡 | Squishy and sleepy blob with a leaf sprout |
-| **Miso** 🐱 | Curious, sneaky cat with a wagging tail and whiskers |
-| **Clover** 🐰 | Bouncy bunny whose ears flop when it sleeps |
-| **Pip** 🐧 | Waddly, dapper penguin in a red scarf who flaps when happy |
-| **Boo** 👻 | Floaty, friendly ghost with a wavy hem |
+| **Mochi** 🍡 | Squishy and sleepy blob with a leaf sprout. Naps a lot and loves company |
+| **Miso** 🐱 | Curious, sneaky cat with a wagging tail and whiskers. Explores and climbs, not very clingy |
+| **Clover** 🐰 | Bouncy bunny whose ears flop when it sleeps. The most playful of the lot |
+| **Pip** 🐧 | Waddly, dapper penguin in a red scarf who flaps when happy. Always hungry |
+| **Boo** 👻 | Floaty, friendly ghost with a wavy hem. Barely sleeps or eats |
 
 Switch pets any time from the settings panel:
 
 ![Settings panel](docs/settings.png)
 
 ## Features
+
+**Has a mind of its own**
+- **Needs**: energy, tummy and joy drift over time. A tired pet naps, a hungry one sulks and asks for its favourite snack, a lonely one comes looking for you, and a happy one dances and gets the zoomies
+- **Personality**: every pet weighs its choices differently (see the table above)
+- **Bond**: petting, treats, playing and focus sessions grow your friendship from *New friend* to *Soulmate*; closer pets follow you more and say fonder things
+- **Memory**: it remembers all of this between launches, rests while the app is closed, and misses you when you've been gone
+- See how it's doing at the top of the menu and in the settings panel
 
 **Moves around your whole screen**
 - Walks the Dock, **climbs the left and right edges**, crawls along the top, and comes back down
@@ -49,10 +58,13 @@ Switch pets any time from the settings panel:
 - Click to pet it (hearts!), click fast to make it blush, poke it while it sleeps
 - Hover over it for a moment and it perks up
 - **Give a treat**: a snack drops from the top of the screen and the pet runs over to eat it
+- **Play ball**: drop a toy and the pet chases it along the Dock and kicks it back into the air
+- **Focus session** (15, 25 or 50 minutes): the pet keeps quiet and calm while you work, then celebrates with you
 - **Shake your mouse** at it and it gets dizzy
 - Tricks: yawn and stretch, spin, dance, look around, zoomies, nap
 - Speech bubbles: random hellos, time-of-day greetings and pet-specific lines (Silent / Quiet / Normal / Chatty)
 - **Bring back to screen** button in case it ever wanders off
+- **Launch at login** (when run from the built `Mochi.app`)
 
 Lightweight: native Swift and AppKit, no dependencies, no Dock icon.
 
@@ -85,7 +97,7 @@ The build is ad-hoc signed, so on first launch macOS may ask you to right-click 
 | --- | --- |
 | Click the pet | Pets it (hearts and a happy hop) |
 | Drag and drop | Pick it up; let go near an edge to make it cling |
-| Right-click the pet or click the menu bar icon | Say hi, pet, come here, give a treat, do a trick, sleep, bring back, settings, quit |
+| Right-click the pet or click the menu bar icon | How it's feeling, say hi, pet, come here, give a treat, play ball, do a trick, sleep, focus session, bring back, settings, quit |
 | `⌘ ,` / `⌘ B` (menu open) | Open settings / bring the pet back |
 
 ## How it works
@@ -101,7 +113,8 @@ Sources/Mochi
 ├── main.swift             entry point
 ├── AppDelegate.swift      menu bar + right-click menu
 ├── PetController.swift    window, 30fps loop, surfaces, physics, reactions
-├── Brain.swift            PetAction, Brain protocol, RuleBrain (swap in AI here)
+├── Brain.swift            PetAction, Brain protocol, MindBrain (swap in AI here)
+├── Mind.swift             the pet's needs, bond and memory (saved between launches)
 ├── PetView.swift          drawing for every pet and mood, mouse input
 ├── Species.swift          pet definitions (colours, speed, lines)
 ├── Dialogue.swift         everything the pet says
@@ -109,7 +122,8 @@ Sources/Mochi
 ├── Platform.swift         finds window tops to stand on
 ├── AudioWatcher.swift     notices which apps are playing sound (music / video / call)
 ├── SystemInfo.swift       idle time and battery
-├── Treat.swift            the snack you can drop for the pet
+├── Treat.swift            the snack and the ball you can drop for the pet
+├── LoginItem.swift        launch at login
 ├── PetSettings.swift      saved preferences (UserDefaults)
 ├── SettingsView.swift     SwiftUI settings panel
 └── Render.swift           `Mochi --render out.png` writes a preview sheet
@@ -124,7 +138,7 @@ Sources/Mochi
 swift run Mochi --render preview.png
 ```
 
-**Add a new action:** add a case to `PetAction` in `Brain.swift`, give it a weight in `RuleBrain`, and handle it in
+**Add a new action:** add a case to `PetAction` in `Brain.swift`, give it a weight in `MindBrain`, and handle it in
 `PetController.behave` (and a `Mood` in `PetView` if it needs a new pose).
 
 **Add AI:** implement the `Brain` protocol:
@@ -141,9 +155,8 @@ then pass it to `PetController(brain:)`.
 
 - [ ] AI brain that chats and decides what to do
 - [ ] Real beat detection (needs audio-capture permission)
-- [ ] More pets and more tricks (play with a ball, hide and peek)
+- [ ] More pets and more tricks (hide and peek)
 - [ ] Multi-monitor roaming
-- [ ] Launch at login
 
 ## Contributing
 

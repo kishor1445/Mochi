@@ -25,6 +25,7 @@ final class PetController {
     private static let reach: CGFloat = 52                  // centre → surface
 
     private let settings = PetSettings.shared
+    private let mind = PetMind.shared
     private let window: PetWindow
     let view = PetView(frame: NSRect(origin: .zero, size: PetView.size))
     private let bubble = SpeechBubble()
@@ -84,10 +85,15 @@ final class PetController {
     private var hoverReacted = false
 
     private var treat: Treat?
+    private var ball: Ball?
+    private var lastKickLine = Date.distantPast
+
+    /// When the running focus session ends (nil = no session).
+    private(set) var focusEnds: Date?
 
     private let chaseSpeed: CGFloat = 170
 
-    init(brain: Brain = RuleBrain()) {
+    init(brain: Brain = MindBrain()) {
         self.brain = brain
 
         window = PetWindow(contentRect: NSRect(origin: .zero, size: PetView.size),
@@ -134,6 +140,12 @@ final class PetController {
             self?.scheduleGreeting(Date())
         }.store(in: &cancellables)
 
+        mind.onLevelUp = { [weak self] level in
+            guard let self else { return }
+            self.view.spawnHearts(6)
+            self.say("We're \(PetMind.title(level).lowercased())s now! 💞", force: true)
+        }
+
         scheduleGreeting(Date())
     }
 
@@ -147,7 +159,15 @@ final class PetController {
         timer = t
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { [weak self] in
             guard let self else { return }
-            self.say("Hi! I'm \(self.settings.species.name)!")
+            if self.mind.isNew {
+                self.say("Hi! I'm \(self.settings.species.name)! Nice to meet you!")
+            } else if self.mind.awaySeconds > 8 * 3600 {
+                self.mind.reunited()
+                self.view.spawnHearts(4)
+                self.say(Dialogue.missedYou.randomElement() ?? "I missed you!")
+            } else {
+                self.say("Hi! I'm \(self.settings.species.name)!")
+            }
         }
     }
 
@@ -156,7 +176,7 @@ final class PetController {
     func greet() {
         touch()
         if surface != .air { apply(Decision(action: .greet, duration: 2.2), forceSay: true) }
-        else { say(Dialogue.greeting(species: settings.species, hour: hour), force: true) }
+        else { say(greetingLine(), force: true) }
     }
 
     func petted() {
@@ -166,6 +186,7 @@ final class PetController {
         lastClick = now
 
         let wasSleeping = action == .sleep
+        mind.petted()
         view.spawnHearts(3)
         if clickStreak >= 5 {
             say("Okay okay, I love you too! 💖", force: true)
@@ -194,10 +215,60 @@ final class PetController {
     func giveTreat() {
         guard treat == nil else { return }
         touch()
+        if mind.isStuffed {
+            say(Dialogue.stuffed.randomElement() ?? "I'm stuffed!", force: true)
+            return
+        }
+        endBall(celebrate: false)
         let f = screenFrame
         let x = clamp(NSEvent.mouseLocation.x, f.minX + 60, f.maxX - 60)
         treat = Treat(emoji: settings.species.treatEmoji, x: x, y: f.maxY - 40)
         say(Dialogue.treatDropped.randomElement() ?? "Ooh, a treat!", force: true)
+    }
+
+    /// Drops a bouncy toy near the mouse; the pet chases it and kicks it around for a while.
+    func playBall() {
+        guard ball == nil, treat == nil else { return }
+        touch()
+        if mind.energy < 0.1 {
+            say(Dialogue.tooTired.randomElement() ?? "Too tired…", force: true)
+            return
+        }
+        let f = screenFrame
+        let x = clamp(NSEvent.mouseLocation.x, f.minX + 60, f.maxX - 60)
+        ball = Ball(emoji: settings.species.toyEmoji, x: x, y: f.minY + 260)
+        say(Dialogue.ballDropped.randomElement() ?? "Ball!", force: true)
+    }
+
+    // MARK: Focus sessions
+
+    var focusMinutesLeft: Int? {
+        focusEnds.map { max(1, Int(ceil($0.timeIntervalSinceNow / 60))) }
+    }
+
+    /// The pet keeps quiet and calm for `minutes`, then celebrates with you.
+    func startFocus(minutes: Int) {
+        touch()
+        focusEnds = Date().addingTimeInterval(TimeInterval(minutes * 60))
+        activeSeconds = 0
+        endBall(celebrate: false)
+        say(Dialogue.focusStart.randomElement() ?? "Focus time!", force: true)
+        if canAct { apply(Decision(action: .idle, duration: 4)) }
+    }
+
+    func stopFocus() {
+        guard focusEnds != nil else { return }
+        focusEnds = nil
+        say(Dialogue.focusStopped.randomElement() ?? "Okay, break time!", force: true)
+    }
+
+    private func finishFocus() {
+        focusEnds = nil
+        activeSeconds = 0
+        mind.focusedTogether()
+        view.spawnHearts(5)
+        say(Dialogue.focusDone.randomElement() ?? "Focus done! 🎉", force: true)
+        if canAct { apply(Decision(action: .dance, duration: 5)) }
     }
 
     /// A random trick, on demand (menu bar / right-click).
@@ -338,6 +409,10 @@ final class PetController {
             t.update(dt, floorY: f.minY - 2)
             if now.timeIntervalSince(t.born) > 40 { t.remove(); treat = nil }
         }
+        if let b = ball {
+            b.update(dt, floorY: f.minY - 2, minX: f.minX + 30, maxX: f.maxX - 30)
+            if now.timeIntervalSince(b.born) > 45 { endBall(celebrate: false) }
+        }
 
         // Safety net: if the pet ever ends up outside every screen, bring it back.
         if !held, !isOnScreen() { bringBack() }
@@ -390,6 +465,10 @@ final class PetController {
                 finish(dt, f)
                 return
             }
+            if let b = ball, handleBall(b, dt, f, now) {
+                finish(dt, f)
+                return
+            }
 
             remaining -= TimeInterval(dt)
             maybeGreet(now)
@@ -437,8 +516,21 @@ final class PetController {
     // MARK: Awareness (once a second)
 
     private func slowTick(_ now: Date) {
-        guard now.timeIntervalSince(lastSlow) >= 1 else { return }
+        let elapsed = now.timeIntervalSince(lastSlow)
+        guard elapsed >= 1 else { return }
         lastSlow = now
+
+        // Needs drift: resting restores energy, running about burns it.
+        let exertion: Double
+        switch action {
+        case .zoomies, .dance, .chase: exertion = 3
+        case .walk: exertion = 1.2
+        default: exertion = ball != nil ? 3 : 0.7
+        }
+        mind.tick(min(elapsed, 5), asleep: action == .sleep, exertion: exertion, personality: settings.species.personality)
+        if media == .music, action != .sleep { mind.enjoyedMusic(min(elapsed, 5)) }
+
+        if let end = focusEnds, now >= end { finishFocus() }
 
         // What's playing?
         let m = settings.reactToMedia ? audio.current : .none
@@ -456,7 +548,7 @@ final class PetController {
 
         // Been working a long time?
         if idle < 60 { activeSeconds += 1 } else if idle > 300 { activeSeconds = 0 }
-        if settings.breakReminders, activeSeconds >= 50 * 60, media != .call {
+        if settings.breakReminders, activeSeconds >= 50 * 60, media != .call, focusEnds == nil {
             activeSeconds = 0
             say("You've been at it for a while. Time to stretch! 🧘", force: true)
             if canAct { apply(Decision(action: .stretch, duration: 3)) }
@@ -579,6 +671,7 @@ final class PetController {
         if t.landed, abs(dx) < 28 {
             t.remove()
             treat = nil
+            mind.fed()
             view.spawnHearts(4)
             say(Dialogue.yum.randomElement() ?? "Yum!", force: true)
             apply(Decision(action: .happy, duration: 2.2))
@@ -594,6 +687,61 @@ final class PetController {
         snap(f)
         targetAngle = 0
         return true
+    }
+
+    // MARK: Playing ball
+
+    /// Returns true while the pet is busy with the ball.
+    private func handleBall(_ b: Ball, _ dt: CGFloat, _ f: NSRect, _ now: Date) -> Bool {
+        // The ball bounces along the Dock floor: come down from walls, the ceiling or windows first.
+        if surface != .floor {
+            letGo()
+            return true
+        }
+        if platform.id != 0 {
+            surface = .air
+            vy = 0
+            cx += (b.x >= cx ? 1 : -1) * 30
+            return true
+        }
+        if b.kicks >= 6 || now.timeIntervalSince(b.born) > 30 {
+            endBall(celebrate: true)
+            return true
+        }
+        let dx = b.x - cx
+        if abs(dx) < 32, b.canKick {
+            // Kick it away, but back towards the middle when it is near a screen edge.
+            var dir: CGFloat = dx >= 0 ? 1 : -1
+            if b.x < f.minX + 220 { dir = 1 } else if b.x > f.maxX - 220 { dir = -1 }
+            b.kick(vx: dir * .random(in: 240...440), vy: .random(in: 420...640))
+            facing = dir
+            view.mood = .happy
+            if now.timeIntervalSince(lastKickLine) > 2.5 {
+                lastKickLine = now
+                say(Dialogue.kick.randomElement() ?? "Boing!")
+            }
+        } else if abs(dx) > 14 {
+            facing = dx > 0 ? 1 : -1
+            view.mood = .chase
+            cx += facing * chaseSpeed * 1.25 * dt
+        } else {
+            view.mood = .idle
+        }
+        snap(f)
+        targetAngle = 0
+        return true
+    }
+
+    private func endBall(celebrate: Bool) {
+        guard let b = ball else { return }
+        b.remove()
+        ball = nil
+        guard celebrate else { return }
+        mind.played()
+        view.spawnHearts(4)
+        say(Dialogue.playedEnough.randomElement() ?? "That was fun!", force: true)
+        action = .happy
+        remaining = 2.2
     }
 
     // MARK: Falling & landing
@@ -707,6 +855,7 @@ final class PetController {
         action = d.action
         remaining = d.duration
         forceClimb = false
+        if let line = d.line { say(line) }
         switch d.action {
         case .walk(let axis):
             facing = map(axis, surface)
@@ -726,7 +875,7 @@ final class PetController {
                 remaining = 1.5
             }
         case .greet:
-            say(Dialogue.greeting(species: settings.species, hour: hour), force: forceSay)
+            say(greetingLine(), force: forceSay)
         case .stretch:
             if Double.random(in: 0..<1) < 0.5 { say("*yaaawn*") }
         case .dance:
@@ -737,6 +886,10 @@ final class PetController {
             break
         }
         view.spin = 0
+    }
+
+    private func greetingLine() -> String {
+        Dialogue.greeting(species: settings.species, hour: hour, bondLevel: mind.level, days: mind.daysTogether)
     }
 
     private func scheduleGreeting(_ now: Date) {
@@ -750,14 +903,14 @@ final class PetController {
     private func maybeGreet(_ now: Date) {
         guard now >= nextGreeting else { return }
         scheduleGreeting(now)
-        if settings.chattiness != .off, action != .sleep, !bubble.visible, media != .call, media != .video, !userAway {
+        if settings.chattiness != .off, action != .sleep, !bubble.visible, media != .call, media != .video, !userAway, focusEnds == nil {
             apply(Decision(action: .greet, duration: 2.2))
         }
     }
 
     func say(_ text: String, force: Bool = false) {
         guard force || settings.chattiness != .off else { return }
-        if media == .call && !force { return }           // quiet during calls
+        if (media == .call || focusEnds != nil) && !force { return }   // quiet during calls and focus sessions
         bubble.say(text)
     }
 
@@ -785,6 +938,8 @@ final class PetController {
         case .dizzy:
             view.mood = .dizzy
             view.spin = sin(view.time * 10) * 0.1
+        case .mope:
+            view.mood = .sad
         case .lookAround:
             view.mood = .idle
             facing = sin(view.time * 2.5) > 0 ? 1 : -1
@@ -914,6 +1069,12 @@ final class PetController {
                           platformAbove: surface == .floor && windowPlatforms.contains { reachable($0, feet: feet) },
                           canClimb: surface == .floor && platform.id == 0 && settings.climbEdges,
                           media: media,
-                          userAway: userAway)
+                          userAway: userAway,
+                          focusing: focusEnds != nil,
+                          species: settings.species,
+                          energy: mind.energy,
+                          fullness: mind.fullness,
+                          joy: mind.joy,
+                          bondLevel: mind.level)
     }
 }

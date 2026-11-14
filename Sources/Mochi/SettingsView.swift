@@ -40,11 +40,55 @@ struct PetCard: View {
     }
 }
 
+/// One labelled need bar on the status card.
+struct NeedBar: View {
+    let icon: String
+    let label: String
+    let value: Double
+    let tint: Color
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text("\(icon) \(label)").font(.caption).foregroundStyle(.secondary)
+            ProgressView(value: min(1, max(0, value))).tint(tint)
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(label) \(Int((value * 100).rounded())) percent")
+    }
+}
+
+/// How the pet is doing right now: feeling, needs and the bond with you.
+struct StatusCard: View {
+    @ObservedObject var mind: PetMind
+    let species: Species
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .firstTextBaseline) {
+                Text("\(species.name) is \(mind.feeling.label.lowercased()) \(mind.feeling.emoji)")
+                    .font(.headline)
+                Spacer()
+                Text("\(mind.bondTitle) · level \(mind.level) · day \(mind.daysTogether)")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+            HStack(spacing: 14) {
+                NeedBar(icon: "⚡️", label: "Energy", value: mind.energy, tint: .orange)
+                NeedBar(icon: species.treatEmoji, label: "Tummy", value: mind.fullness, tint: .green)
+                NeedBar(icon: "💖", label: "Joy", value: mind.joy, tint: .pink)
+                NeedBar(icon: "🤝", label: "Bond", value: mind.levelProgress, tint: .purple)
+            }
+        }
+        .padding(12)
+        .background(RoundedRectangle(cornerRadius: 14).fill(Color.primary.opacity(0.05)))
+    }
+}
+
 struct SettingsView: View {
     @ObservedObject var settings: PetSettings
     var onSayHi: () -> Void
     var onBringBack: () -> Void
     var onTreat: () -> Void
+    var onPlay: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
@@ -57,7 +101,7 @@ struct SettingsView: View {
                 }
             }
 
-            Divider()
+            StatusCard(mind: .shared, species: settings.species)
 
             HStack {
                 Text("Speech bubbles")
@@ -77,16 +121,20 @@ struct SettingsView: View {
                 Toggle("React to music, videos and calls", isOn: $settings.reactToMedia)
                 Toggle("Remind me to take a break", isOn: $settings.breakReminders)
                 Toggle("Comment on battery and time of day", isOn: $settings.systemAware)
+                Toggle(LoginItem.available ? "Launch at login" : "Launch at login (needs the built Mochi.app)",
+                       isOn: Binding(get: { settings.launchAtLogin }, set: { settings.launchAtLogin = LoginItem.set($0) }))
+                    .disabled(!LoginItem.available)
             }
 
             HStack {
-                Text("Tip: drag your pet to a screen edge and let go. It will cling there.")
+                Text("Tip: treats, play and pets keep your pet happy and grow your bond. Right-click it for a focus session.")
                     .font(.caption).foregroundStyle(.secondary)
                 Spacer()
             }
             HStack {
                 Button("Bring back to screen", action: onBringBack)
                 Spacer()
+                Button("Play ball \(settings.species.toyEmoji)", action: onPlay)
                 Button("Give a treat \(settings.species.treatEmoji)", action: onTreat)
                 Button("Say hi!", action: onSayHi)
             }
@@ -102,16 +150,19 @@ final class SettingsWindowController {
     private let onSayHi: () -> Void
     private let onBringBack: () -> Void
     private let onTreat: () -> Void
+    private let onPlay: () -> Void
 
-    init(onSayHi: @escaping () -> Void, onBringBack: @escaping () -> Void, onTreat: @escaping () -> Void) {
+    init(onSayHi: @escaping () -> Void, onBringBack: @escaping () -> Void, onTreat: @escaping () -> Void,
+         onPlay: @escaping () -> Void) {
         self.onSayHi = onSayHi
         self.onBringBack = onBringBack
         self.onTreat = onTreat
+        self.onPlay = onPlay
     }
 
     func show() {
         if window == nil {
-            let hosting = NSHostingController(rootView: SettingsView(settings: .shared, onSayHi: onSayHi, onBringBack: onBringBack, onTreat: onTreat))
+            let hosting = NSHostingController(rootView: SettingsView(settings: .shared, onSayHi: onSayHi, onBringBack: onBringBack, onTreat: onTreat, onPlay: onPlay))
             let w = NSWindow(contentViewController: hosting)
             w.title = "Pet Settings"
             w.styleMask = [.titled, .closable, .miniaturizable]

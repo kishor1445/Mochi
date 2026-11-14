@@ -47,6 +47,28 @@ enum Species: String, CaseIterable, Identifiable {
         }
     }
 
+    /// Favourite toy, used by "Play ball".
+    var toyEmoji: String {
+        switch self {
+        case .mochi: return "⚽️"
+        case .cat: return "🧶"
+        case .bunny: return "🥎"
+        case .penguin: return "🏐"
+        case .ghost: return "🎃"
+        }
+    }
+
+    /// What makes this pet itself; `MindBrain` leans its choices by these.
+    var personality: Personality {
+        switch self {
+        case .mochi: return Personality(playful: 0.8, sleepy: 1.5, curious: 0.8, cuddly: 1.3, appetite: 1.0)
+        case .cat: return Personality(playful: 1.1, sleepy: 1.2, curious: 1.6, cuddly: 0.7, appetite: 1.1)
+        case .bunny: return Personality(playful: 1.5, sleepy: 0.8, curious: 1.0, cuddly: 1.2, appetite: 1.3)
+        case .penguin: return Personality(playful: 1.0, sleepy: 0.9, curious: 1.1, cuddly: 1.0, appetite: 1.4)
+        case .ghost: return Personality(playful: 1.2, sleepy: 0.6, curious: 1.4, cuddly: 0.9, appetite: 0.6)
+        }
+    }
+
     var walkSpeed: CGFloat {
         switch self {
         case .mochi: return 55
