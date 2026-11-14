@@ -20,6 +20,8 @@ enum PetAction: Equatable {
     case climbEdge             // walk to the nearest screen edge on purpose and climb it
     case dizzy                 // spiral eyes after the cursor is shaken at it
     case mope                  // sits there looking sad (hungry or lonely)
+    case hide                  // sneak to the screen edge, duck behind it, then peek out
+    case visit                 // run over to the other pet and say hi
 }
 
 struct Decision {
@@ -38,6 +40,7 @@ struct PetContext {
     let hour: Int
     let platformAbove: Bool            // a window is within leaping reach
     let canClimb: Bool                 // on the Dock floor with climbing enabled
+    let canHide: Bool                  // on the Dock floor with a screen edge to duck behind
     let media: MediaActivity           // what is playing on the Mac
     let userAway: Bool                 // nobody has touched the Mac for a while
     let focusing: Bool                 // a focus session is running: keep calm
@@ -121,6 +124,9 @@ final class MindBrain: Brain {
             if ctx.platformAbove && ctx.surface == .floor {
                 o.append((3, Decision(action: .leap, duration: 2)))
             }
+            if ctx.canHide && ctx.media != .video {
+                o.append((1.6, d(.hide, 14, 16)))
+            }
             if ctx.canClimb && ctx.media != .video {
                 o.append((3.5, d(.climbEdge, 10, 14)))
             }
@@ -136,7 +142,7 @@ final class MindBrain: Brain {
             switch a {
             case .sleep:
                 return p.sleepy * (tired ? 4 : 1) * (ctx.energy > 0.8 && !late ? 0.4 : 1)
-            case .dance, .zoomies, .spin:
+            case .dance, .zoomies, .spin, .hide:
                 return p.playful * (joyful ? 1.6 : 1) * (tired ? 0.2 : 1) * (lonely || hungry ? 0.4 : 1)
             case .happy:
                 return joyful ? 1.8 : (lonely || hungry ? 0.3 : 1)

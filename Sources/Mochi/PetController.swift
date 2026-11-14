@@ -27,12 +27,18 @@ final class PetController {
     private var reach: CGFloat { 52 * scale }               // centre → surface
 
     private let settings = PetSettings.shared
+    /// The main pet owns the needs, reminders, focus sessions and toys. A companion just lives alongside it.
+    let isMain: Bool
+    weak var buddy: PetController?
+    private var species: Species { isMain ? settings.species : settings.companionSpecies }
     private let mind = PetMind.shared
     private let window: PetWindow
     let view = PetView(frame: NSRect(origin: .zero, size: PetView.size))
     private let bubble = SpeechBubble()
     private let brain: Brain
-    private let audio = AudioWatcher()
+    private let audio = AudioWatcher.shared
+    private let log = DailyLog.shared
+    private let calendar = CalendarWatcher()
     private var cancellables = Set<AnyCancellable>()
     private var timer: Timer?
 
@@ -44,6 +50,24 @@ final class PetController {
     private var facing: CGFloat = 1
     private var targetAngle: CGFloat = 0
     private var held = false
+    private var vx: CGFloat = 0                     // sideways speed while thrown
+    private var thrown = false
+    private var bounces = 0
+    private var dragVelocity = CGPoint.zero
+
+    // Hide and peek
+    private enum HidePhase { case none, going, hidden }
+    private var hidePhase = HidePhase.none
+    private var hideSide: CGFloat = -1              // which screen edge: -1 left, +1 right
+    private var hideShift: CGFloat = 0              // how far the window is slid past the edge
+
+    // Two pets
+    private var nextVisit = Date().addingTimeInterval(.random(in: 25...60))
+
+    // Power
+    private var pauseReasons = Set<String>()
+    private var fps = 0
+    private var lastFrame = Date()
     private var jump: Jump?
     private var forceClimb = false
 
@@ -96,6 +120,17 @@ final class PetController {
     private var nextTypingCheer: TimeInterval = 60
     private var fastCheerAfter = Date.distantPast
 
+    // Gentle reminders, busy Mac, calendar
+    private var reminderElapsed: [ReminderKind: TimeInterval] = [:]
+    private var lastReminder = Date.distantPast
+    private var lastCPU = SystemInfo.cpuTicks()
+    private var lastCPUCheck = Date.distantPast
+    private var busySeconds: TimeInterval = 0
+    private var busyCooldown = Date.distantPast
+    private var hotCooldown = Date.distantPast
+    private var lastCalendarCheck = Date.distantPast
+    private var focusPlanned = 0
+
     private var treat: Treat?
     private var ball: Ball?
     private var lastKickLine = Date.distantPast
@@ -105,8 +140,9 @@ final class PetController {
 
     private let chaseSpeed: CGFloat = 170
 
-    init(brain: Brain = MindBrain()) {
+    init(brain: Brain = MindBrain(), isMain: Bool = true) {
         self.brain = brain
+        self.isMain = isMain
 
         let side = PetView.side * PetSettings.shared.petSize.scale
         window = PetWindow(contentRect: NSRect(x: 0, y: 0, width: side, height: side),
@@ -132,7 +168,8 @@ final class PetController {
         }
 
         BubbleView.scale = settings.petSize.bubbleScale
-        view.species = settings.species
+        view.species = species
+        view.outfit = wornOutfit
         view.onClick = { [weak self] in self?.petted() }
         view.onDragBegan = { [weak self] in self?.dragBegan() }
         view.onDragEnded = { [weak self] in self?.dragEnded() }
@@ -140,11 +177,11 @@ final class PetController {
         checkDock()
         let f = screenFrame
         platform = dock(f)
-        cx = f.midX
+        cx = f.midX + (isMain ? 0 : 140)
         cy = platform.top + reach
         window.setFrameOrigin(NSPoint(x: cx - half, y: cy - half))
 
-        settings.$species.dropFirst().receive(on: DispatchQueue.main).sink { [weak self] s in
+        (isMain ? settings.$species : settings.$companionSpecies).dropFirst().receive(on: DispatchQueue.main).sink { [weak self] s in
             guard let self else { return }
             self.view.species = s
             self.view.spawnHearts(4)
@@ -165,10 +202,23 @@ final class PetController {
             self?.scheduleGreeting(Date())
         }.store(in: &cancellables)
 
-        mind.onLevelUp = { [weak self] level in
-            guard let self else { return }
-            self.view.spawnHearts(6)
-            self.say("We're \(PetMind.title(level).lowercased())s now! 💞", force: true)
+        if isMain {
+            settings.$outfit.dropFirst().receive(on: DispatchQueue.main).sink { [weak self] _ in
+                guard let self else { return }
+                self.view.outfit = self.wornOutfit
+            }.store(in: &cancellables)
+
+            mind.onLevelUp = { [weak self] level in
+                guard let self else { return }
+                self.view.spawnHearts(6)
+                self.say("We're \(PetMind.title(level).lowercased())s now! 💞", force: true)
+                // A new level unlocks a new thing to wear: mention it once the first bubble has gone.
+                if let gift = Outfit.allCases.first(where: { $0.unlockLevel == level }) {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 4) { [weak self] in
+                        self?.say(Dialogue.newOutfit(gift), force: true)
+                    }
+                }
+            }
         }
 
         scheduleGreeting(Date())
@@ -179,24 +229,103 @@ final class PetController {
     func start() {
         window.orderFrontRegardless()
         audio.start()
-        let t = Timer(timeInterval: 1.0 / 30.0, repeats: true) { [weak self] _ in self?.tick(1.0 / 30.0) }
-        RunLoop.main.add(t, forMode: .common)
-        timer = t
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { [weak self] in
+        lastFrame = Date()
+        schedule(30)
+        DispatchQueue.main.asyncAfter(deadline: .now() + (isMain ? 0.8 : 2.4)) { [weak self] in
             guard let self else { return }
-            if self.mind.isNew {
-                self.say("Hi! I'm \(self.settings.species.name)! Nice to meet you!")
+            if !self.isMain {
+                self.say("Hi! I'm \(self.species.name)!")
+            } else if self.settings.dailyCheckIn, self.log.hasFreshYesterday, self.log.current.activeSeconds < 120,
+                      let y = self.log.yesterday {
+                // First visit of the day: a quick look back.
+                self.say(y.summary(prefix: "Yesterday"), force: true, seconds: 7)
+            } else if self.mind.isNew {
+                self.say("Hi! I'm \(self.species.name)! Nice to meet you!")
             } else if self.mind.awaySeconds > 8 * 3600 {
                 self.mind.reunited()
                 self.view.spawnHearts(4)
                 self.say(Dialogue.missedYou.randomElement() ?? "I missed you!")
             } else {
-                self.say("Hi! I'm \(self.settings.species.name)!")
+                self.say("Hi! I'm \(self.species.name)!")
             }
         }
     }
 
     func setContextMenu(_ menu: NSMenu) { view.menu = menu }
+
+    /// Remove this pet from the screen for good (used when the second pet is switched off).
+    func stop() {
+        timer?.invalidate()
+        timer = nil
+        cancellables.removeAll()
+        treat?.remove(); treat = nil
+        ball?.remove(); ball = nil
+        bubble.hide()
+        window.orderOut(nil)
+    }
+
+    // MARK: Power
+
+    /// Stop animating entirely (Mac asleep, display off, screen locked). Nothing runs until `resume`.
+    func pause(_ reason: String) {
+        pauseReasons.insert(reason)
+        timer?.invalidate()
+        timer = nil
+        fps = 0
+        if isMain { mind.save(); log.publish() }
+    }
+
+    func resume(_ reason: String) {
+        pauseReasons.remove(reason)
+        guard pauseReasons.isEmpty, timer == nil else { return }
+        lastFrame = Date()
+        lastSlow = Date()                          // time spent asleep doesn't count as time awake
+        keyCount = SystemInfo.keyPressCount()
+        lastCPU = SystemInfo.cpuTicks()
+        schedule(30)
+        window.orderFrontRegardless()
+    }
+
+    private func schedule(_ rate: Int) {
+        timer?.invalidate()
+        fps = rate
+        let t = Timer(timeInterval: 1.0 / Double(rate), repeats: true) { [weak self] _ in self?.frame() }
+        t.tolerance = 0.2 / Double(rate)           // lets macOS line the wake-ups up with other work
+        RunLoop.main.add(t, forMode: .common)
+        timer = t
+    }
+
+    /// Full speed only when something is moving; a napping pet barely costs anything.
+    private var wantedFPS: Int {
+        if held || jump != nil || surface == .air || treat != nil || ball != nil || bubble.visible { return 30 }
+        if action == .sleep { return 6 }
+        if ProcessInfo.processInfo.isLowPowerModeEnabled { return 15 }
+        switch action {
+        case .idle, .lookAround, .mope, .leap, .climbEdge:
+            // Just standing there: breathing and blinking look fine at half speed.
+            return view.musicBpm > 0 || view.tap > 0 || slipTimer > 0 || abs(hideShift) > 0.5 ? 30 : 15
+        case .hide where hidePhase == .hidden:
+            return 15
+        default:
+            return 30
+        }
+    }
+
+    private func frame() {
+        let now = Date()
+        let dt = CGFloat(min(0.2, max(0.001, now.timeIntervalSince(lastFrame))))
+        lastFrame = now
+        tick(dt)
+        let want = wantedFPS
+        if want != fps, timer != nil { schedule(want) }
+    }
+
+    private var wornOutfit: Outfit {
+        isMain && settings.outfit.unlockLevel <= mind.level ? settings.outfit : .none
+    }
+
+    /// Focus sessions belong to the main pet; a companion keeps quiet along with it.
+    private var focusing: Bool { (isMain ? focusEnds : buddy?.focusEnds) != nil }
 
     func greet() {
         touch()
@@ -212,6 +341,7 @@ final class PetController {
 
         let wasSleeping = action == .sleep
         mind.petted()
+        log.petted()
         view.spawnHearts(3)
         if clickStreak >= 5 {
             say("Okay okay, I love you too! 💖", force: true)
@@ -247,7 +377,7 @@ final class PetController {
         endBall(celebrate: false)
         let f = screenFrame
         let x = clamp(NSEvent.mouseLocation.x, f.minX + 60, f.maxX - 60)
-        treat = Treat(emoji: settings.species.treatEmoji, x: x, y: f.maxY - 40)
+        treat = Treat(emoji: species.treatEmoji, x: x, y: f.maxY - 40)
         say(Dialogue.treatDropped.randomElement() ?? "Ooh, a treat!", force: true)
     }
 
@@ -261,7 +391,7 @@ final class PetController {
         }
         let f = screenFrame
         let x = clamp(NSEvent.mouseLocation.x, f.minX + 60, f.maxX - 60)
-        ball = Ball(emoji: settings.species.toyEmoji, x: x, y: f.minY + 260)
+        ball = Ball(emoji: species.toyEmoji, x: x, y: f.minY + 260)
         say(Dialogue.ballDropped.randomElement() ?? "Ball!", force: true)
     }
 
@@ -275,6 +405,7 @@ final class PetController {
     func startFocus(minutes: Int) {
         touch()
         focusEnds = Date().addingTimeInterval(TimeInterval(minutes * 60))
+        focusPlanned = minutes
         activeSeconds = 0
         endBall(celebrate: false)
         say(Dialogue.focusStart.randomElement() ?? "Focus time!", force: true)
@@ -287,10 +418,18 @@ final class PetController {
         say(Dialogue.focusStopped.randomElement() ?? "Okay, break time!", force: true)
     }
 
+    /// Says how today has gone so far (menu: Daily Check-in).
+    func checkIn() {
+        touch()
+        say(log.current.summary(prefix: "Today"), force: true, seconds: 7)
+        if canAct { apply(Decision(action: .happy, duration: 1.6)) }
+    }
+
     private func finishFocus() {
         focusEnds = nil
         activeSeconds = 0
         mind.focusedTogether()
+        log.focused(minutes: focusPlanned)
         view.spawnHearts(5)
         say(Dialogue.focusDone.randomElement() ?? "Focus done! 🎉", force: true)
         if canAct { apply(Decision(action: .dance, duration: 5)) }
@@ -314,6 +453,9 @@ final class PetController {
         touch()
         held = false
         jump = nil
+        thrown = false
+        vx = 0
+        hidePhase = .none
         let f = (NSScreen.main ?? NSScreen.screens[0]).visibleFrame
         surface = .air
         vy = 0
@@ -401,7 +543,9 @@ final class PetController {
     // MARK: Platforms (windows)
 
     private func refreshPlatforms(_ now: Date, _ f: NSRect) {
-        guard now.timeIntervalSince(lastScan) > 0.25 else { return }
+        // Standing on a window needs quick updates to follow it; otherwise twice a second is plenty.
+        let every = (surface == .floor && platform.id != 0) || jump != nil ? 0.25 : 0.5
+        guard now.timeIntervalSince(lastScan) > every else { return }
         lastScan = now
         if now < freezeUntil { return }            // Spaces are sliding: keep what we knew
         checkDock()
@@ -467,8 +611,12 @@ final class PetController {
         trackTyping(dt, now)
 
         if held {
-            cx = window.frame.midX
-            cy = window.frame.midY
+            // Remember how fast the pet is being dragged, so letting go mid-swing throws it.
+            let px = window.frame.midX, py = window.frame.midY
+            dragVelocity.x = dragVelocity.x * 0.55 + (px - cx) / dt * 0.45
+            dragVelocity.y = dragVelocity.y * 0.55 + (py - cy) / dt * 0.45
+            cx = px
+            cy = py
             view.mood = .held
             targetAngle = 0
         } else if var j = jump {
@@ -519,6 +667,7 @@ final class PetController {
 
             remaining -= TimeInterval(dt)
             maybeGreet(now)
+            maybeVisit(now)
             if remaining <= 0 { apply(brain.nextDecision(context(f))) }
             behave(dt, f)
             targetAngle = angle(for: surface)
@@ -544,12 +693,17 @@ final class PetController {
                             y: (-ux * sin(a) + uy * cos(a)) * strength)
         view.facing = facing
 
-        window.setFrameOrigin(NSPoint(x: cx - half, y: cy - half))
+        // Hide and peek: slide past the screen edge until only half the face shows.
+        let hidden = action == .hide && hidePhase == .hidden
+        hideShift += ((hidden ? hideSide * (reach + 2 * scale) : 0) - hideShift) * min(1, dt * 9)
+        if abs(hideShift) < 0.3, !hidden { hideShift = 0 }
+        let origin = NSPoint(x: cx - half + hideShift, y: cy - half)
+        if origin != window.frame.origin { window.setFrameOrigin(origin) }     // moving a window isn't free
         view.needsDisplay = true
 
         if bubble.visible {
             let k = scale
-            let head = settings.species.headRoom * k
+            let head = (species.headRoom + view.outfit.headRoom) * k
             switch surface {
             case .ceiling:
                 bubble.update(centerX: cx, aboveY: cy + 46 * k, belowY: cy - 4 * k - head - 2, preferBelow: true, limit: f)
@@ -575,10 +729,12 @@ final class PetController {
         case .walk: exertion = 1.2
         default: exertion = ball != nil ? 3 : 0.7
         }
-        mind.tick(min(elapsed, 5), asleep: action == .sleep, exertion: exertion, personality: settings.species.personality)
-        if media == .music, action != .sleep { mind.enjoyedMusic(min(elapsed, 5)) }
-
-        if let end = focusEnds, now >= end { finishFocus() }
+        let step = min(elapsed, 5)
+        if isMain {
+            mind.tick(step, asleep: action == .sleep, exertion: exertion, personality: species.personality)
+            if media == .music, action != .sleep { mind.enjoyedMusic(step) }
+            if let end = focusEnds, now >= end { finishFocus() }
+        }
 
         // What's playing?
         let m = settings.reactToMedia ? audio.current : .none
@@ -594,39 +750,49 @@ final class PetController {
             welcomeBack()
         }
 
+        guard isMain else { return }              // everything below is the main pet's job
+        log.tick(step, userActive: idle < 60)
+
         // Been working a long time?
-        if idle < 60 { activeSeconds += 1 } else if idle > 300 { activeSeconds = 0 }
+        if idle < 60 { activeSeconds += step } else if idle > 300 { activeSeconds = 0 }
         if settings.breakReminders, activeSeconds >= 50 * 60, media != .call, focusEnds == nil {
             activeSeconds = 0
+            lastReminder = now
             say("You've been at it for a while. Time to stretch! 🧘", force: true)
             if canAct { apply(Decision(action: .stretch, duration: 3)) }
         }
+        checkReminders(step, idle: idle, now)
+        checkCalendar(now)
 
-        if settings.systemAware { checkHour(); checkBattery(now) }
+        if settings.systemAware { checkHour(); checkBattery(now); checkLoad(now) }
+        else { view.sweat = false; view.shiver = false }
     }
 
     private func mediaChanged() {
         switch media {
         case .music, .other:
             view.musicBpm = .random(in: 100...126)
-            if media == .music { say("Ooh, music! 🎵") }
+            if !isMain {}
+            else if media == .music { say("Ooh, music! 🎵") }
             else if Bool.random() { say("Something's playing… 🎧") }
             if canAct, !userAway { apply(Decision(action: .dance, duration: 7)) }
         case .video:
             view.musicBpm = 0
-            say("Movie time! 🍿")
+            if isMain { say("Movie time! 🍿") }
             if canAct, !userAway { apply(Decision(action: .idle, duration: 5)) }
         case .call:
             view.musicBpm = 0
-            say("Shh… I'll be quiet 🤫", force: true)
+            if isMain { say("Shh… I'll be quiet 🤫", force: true) }
             if canAct, !userAway { apply(Decision(action: .idle, duration: 5)) }
         case .none:
-            if view.musicBpm > 0 { say("Aww, the music stopped 🥲") }
+            if view.musicBpm > 0, isMain { say("Aww, the music stopped 🥲") }
             view.musicBpm = 0
         }
     }
 
     private func welcomeBack() {
+        guard isMain else { return }
+        log.tookBreak()
         say("Welcome back! 👋")
         view.spawnHearts(3)
         if canAct { apply(Decision(action: .happy, duration: 2)) }
@@ -639,6 +805,7 @@ final class PetController {
         switch h {
         case 12: say("Lunch time! 🍱")
         case 17: say("Almost done for the day? 🌇")
+        case 18: if settings.dailyCheckIn { say(log.current.summary(prefix: "Today"), seconds: 7) }
         case 22: say("Getting late… bedtime soon? 🌙")
         case 0: say("It's past midnight! Time to sleep? 😴")
         default: break
@@ -659,7 +826,70 @@ final class PetController {
             say("Battery's at \(b.level)%. Plug me in? 🔋", force: true)
         }
         if b.charging || b.level > 30 { batteryWarned = false }
+        view.shiver = b.level <= 10 && !b.charging      // running on fumes
     }
+
+    /// Busy Mac: sweat while the processor is flat out, and say so if it goes on.
+    private func checkLoad(_ now: Date) {
+        let gap = now.timeIntervalSince(lastCPUCheck)
+        guard gap >= 5 else { return }
+        lastCPUCheck = now
+        guard let cur = SystemInfo.cpuTicks() else { return }
+        defer { lastCPU = cur }
+        guard let prev = lastCPU, cur.total > prev.total else { return }
+        let load = (cur.busy - prev.busy) / (cur.total - prev.total)
+
+        busySeconds = load > 0.8 ? busySeconds + gap : 0
+        view.sweat = busySeconds >= 10
+        if busySeconds >= 25, now > busyCooldown, canAct, action != .sleep {
+            busyCooldown = now.addingTimeInterval(600)
+            say(Dialogue.busyMac.randomElement() ?? "Phew!")
+        }
+        let state = ProcessInfo.processInfo.thermalState
+        if state == .serious || state == .critical {
+            view.sweat = true
+            if now > hotCooldown {
+                hotCooldown = now.addingTimeInterval(900)
+                say(Dialogue.hotMac.randomElement() ?? "It's warm in here!")
+            }
+        }
+    }
+
+    // MARK: Gentle reminders and calendar
+
+    /// Each reminder counts time you are actually at the Mac, and waits for calls and focus sessions to end.
+    private func checkReminders(_ dt: TimeInterval, idle: TimeInterval, _ now: Date) {
+        if idle > 300 { reminderElapsed.removeAll(); return }     // you stepped away: start over
+        guard idle < 60 else { return }
+        for kind in ReminderKind.allCases {
+            guard let every = settings.interval(kind) else { reminderElapsed[kind] = nil; continue }
+            reminderElapsed[kind, default: 0] += dt
+            guard reminderElapsed[kind, default: 0] >= TimeInterval(every * 60),
+                  now.timeIntervalSince(lastReminder) > 120,          // never two nudges back to back
+                  media != .call, focusEnds == nil, !userAway else { continue }
+            reminderElapsed[kind] = 0
+            lastReminder = now
+            say(Dialogue.reminder(kind).randomElement() ?? kind.label, force: true, seconds: 6)
+            if canAct, action != .sleep {
+                switch kind {
+                case .water: apply(Decision(action: .happy, duration: 1.6))
+                case .posture: apply(Decision(action: .stretch, duration: 2.6))
+                case .eyes: apply(Decision(action: .lookAround, duration: 3))
+                }
+            }
+        }
+    }
+
+    private func checkCalendar(_ now: Date) {
+        guard settings.calendarAlerts, now.timeIntervalSince(lastCalendarCheck) >= 30 else { return }
+        lastCalendarCheck = now
+        guard let alert = calendar.due(now: now).first else { return }
+        say(Dialogue.meeting(alert.title, minutes: alert.minutes), force: true, seconds: 7)
+        if canAct { apply(Decision(action: .happy, duration: 2)) }
+    }
+
+    /// Turns calendar alerts on, asking macOS for access the first time. `done(false)` means access was refused.
+    func enableCalendar(_ done: @escaping (Bool) -> Void) { calendar.requestAccess(done) }
 
     // MARK: Cursor interactions
 
@@ -719,11 +949,11 @@ final class PetController {
 
         // A streak survives short thinking pauses and ends after a real break.
         let pause = now.timeIntervalSince(lastKey)
-        if pause < 2.5 { typingStreak += t }
+        if pause < 2.5 { typingStreak += t; if isMain { log.typed(t) } }
         else if pause > 8 { typingStreak = 0; nextTypingCheer = 60 }
         fastTyping = typingRate > 7 ? fastTyping + t : max(0, fastTyping - t)
 
-        guard canAct, !userAway, action != .sleep, treat == nil, ball == nil else { return }
+        guard isMain, canAct, !userAway, action != .sleep, treat == nil, ball == nil else { return }
         if fastTyping > 4, now > fastCheerAfter {
             fastTyping = 0
             fastCheerAfter = now.addingTimeInterval(180)
@@ -759,6 +989,7 @@ final class PetController {
             t.remove()
             treat = nil
             mind.fed()
+            log.gaveTreat()
             view.spawnHearts(4)
             say(Dialogue.yum.randomElement() ?? "Yum!", force: true)
             apply(Decision(action: .happy, duration: 2.2))
@@ -825,6 +1056,7 @@ final class PetController {
         ball = nil
         guard celebrate else { return }
         mind.played()
+        log.played()
         view.spawnHearts(4)
         say(Dialogue.playedEnough.randomElement() ?? "That was fun!", force: true)
         action = .happy
@@ -837,6 +1069,14 @@ final class PetController {
         let prevFeet = cy - reach
         vy -= 1800 * dt
         cy += vy * dt
+        if thrown {
+            // Tumble through the air and bounce off the sides and the top of the screen.
+            cx += vx * dt
+            view.spin -= vx * dt * 0.012
+            if cx < f.minX + reach { cx = f.minX + reach; vx = abs(vx) * 0.6 }
+            if cx > f.maxX - reach { cx = f.maxX - reach; vx = -abs(vx) * 0.6 }
+            if cy > f.maxY - reach { cy = f.maxY - reach; vy = -abs(vy) * 0.5 }
+        }
         let newFeet = cy - reach
         cx = clamp(cx, f.minX + reach, f.maxX - reach)
         view.mood = .held
@@ -850,6 +1090,29 @@ final class PetController {
     }
 
     private func land(on p: Platform, _ f: NSRect) {
+        if thrown {
+            if abs(vy) > 420, bounces < 3 {
+                // Still going fast: bounce.
+                bounces += 1
+                vy = abs(vy) * 0.45
+                vx *= 0.7
+                cy = p.top + reach + 1
+                return
+            }
+            thrown = false
+            vx = 0
+            view.spin = 0
+            platform = p
+            surface = .floor
+            vy = 0
+            cx = clamp(cx, p.minX, p.maxX)
+            cy = p.top + reach
+            action = .dizzy
+            remaining = 2.4
+            targetAngle = 0
+            say(Dialogue.crashLanded.randomElement() ?? "Whoa…", force: true)
+            return
+        }
         platform = p
         surface = .floor
         vy = 0
@@ -899,6 +1162,10 @@ final class PetController {
     private func dragBegan() {
         held = true
         jump = nil
+        thrown = false
+        vx = 0
+        dragVelocity = .zero
+        hidePhase = .none
         slipTimer = 0
         slipped = false
         gripTime = 0
@@ -914,6 +1181,19 @@ final class PetController {
         cy = window.frame.midY
         vy = 0
         gripTime = 0
+
+        // Let go mid-swing and the pet goes flying.
+        if hypot(dragVelocity.x, dragVelocity.y) > 650 {
+            thrown = true
+            bounces = 0
+            vx = clamp(dragVelocity.x, -2400, 2400)
+            vy = clamp(dragVelocity.y, -2400, 2600)
+            cx = clamp(cx, f.minX + reach, f.maxX - reach)
+            cy = min(cy, f.maxY - reach)
+            surface = .air
+            say(Dialogue.thrown.randomElement() ?? "Wheee!", force: true)
+            return
+        }
 
         // Let go close to a screen edge and the pet clings to it instead of dropping to the dock.
         let dl = cx - f.minX, dr = f.maxX - cx, dt = f.maxY - cy
@@ -942,6 +1222,7 @@ final class PetController {
         action = d.action
         remaining = d.duration
         forceClimb = false
+        hidePhase = .none
         if let line = d.line { say(line) }
         switch d.action {
         case .walk(let axis):
@@ -961,6 +1242,15 @@ final class PetController {
                 action = .idle
                 remaining = 1.5
             }
+        case .hide:
+            if surface == .floor, platform.id == 0, NSScreen.screens.count == 1 {
+                hideSide = (cx - platform.minX) < (platform.maxX - cx) ? -1 : 1
+                facing = hideSide
+                hidePhase = .going
+            } else {
+                action = .idle
+                remaining = 1.5
+            }
         case .greet:
             say(greetingLine(), force: forceSay)
         case .stretch:
@@ -976,12 +1266,13 @@ final class PetController {
     }
 
     private func greetingLine() -> String {
-        Dialogue.greeting(species: settings.species, hour: hour, bondLevel: mind.level, days: mind.daysTogether)
+        Dialogue.greeting(species: species, hour: hour, bondLevel: mind.level, days: mind.daysTogether)
     }
 
     private func scheduleGreeting(_ now: Date) {
         if let r = settings.chattiness.interval {
-            nextGreeting = now.addingTimeInterval(.random(in: r))
+            // A companion chimes in about half as often as the main pet.
+            nextGreeting = now.addingTimeInterval(.random(in: r) * (isMain ? 1 : 2.2))
         } else {
             nextGreeting = now.addingTimeInterval(60)
         }
@@ -990,15 +1281,15 @@ final class PetController {
     private func maybeGreet(_ now: Date) {
         guard now >= nextGreeting else { return }
         scheduleGreeting(now)
-        if settings.chattiness != .off, action != .sleep, !bubble.visible, media != .call, media != .video, !userAway, focusEnds == nil {
+        if settings.chattiness != .off, action != .sleep, !bubble.visible, media != .call, media != .video, !userAway, !focusing {
             apply(Decision(action: .greet, duration: 2.2))
         }
     }
 
-    func say(_ text: String, force: Bool = false) {
+    func say(_ text: String, force: Bool = false, seconds: TimeInterval = 3.6) {
         guard force || settings.chattiness != .off else { return }
-        if (media == .call || focusEnds != nil) && !force { return }   // quiet during calls and focus sessions
-        bubble.say(text)
+        if (media == .call || focusing) && !force { return }   // quiet during calls and focus sessions
+        bubble.say(text, for: seconds)
     }
 
     private func behave(_ dt: CGFloat, _ f: NSRect) {
@@ -1012,7 +1303,7 @@ final class PetController {
             view.mood = .happy
         case .walk:
             view.mood = .walk
-            advance(settings.species.walkSpeed * dt, autonomous: true, f)
+            advance(species.walkSpeed * dt, autonomous: true, f)
         case .chase:
             chase(dt, f)
         case .stretch:
@@ -1027,15 +1318,88 @@ final class PetController {
             view.spin = sin(view.time * 10) * 0.1
         case .mope:
             view.mood = .sad
+        case .hide:
+            hideAndPeek(dt, f)
+        case .visit:
+            visitBuddy(dt, f)
         case .lookAround:
             view.mood = .idle
             facing = sin(view.time * 2.5) > 0 ? 1 : -1
         case .zoomies:
             view.mood = .chase
             if Double.random(in: 0..<1) < 0.03 { turnAround() }
-            advance(settings.species.walkSpeed * 3.5 * dt, autonomous: true, f)
+            advance(species.walkSpeed * 3.5 * dt, autonomous: true, f)
         }
         snap(f)
+    }
+
+    // MARK: Hide and peek
+
+    private func hideAndPeek(_ dt: CGFloat, _ f: NSRect) {
+        switch hidePhase {
+        case .going:
+            view.mood = .walk
+            advance(species.walkSpeed * 1.4 * dt, autonomous: true, f)   // floorEnd() ducks behind the edge
+        case .hidden:
+            view.mood = .idle
+            facing = -hideSide
+            let m = NSEvent.mouseLocation
+            // Pop out when you come looking, or when it gets bored of waiting.
+            if hypot(m.x - cx, m.y - cy) < 190 || remaining < 1.7 {
+                hidePhase = .none
+                action = .happy
+                remaining = 1.6
+                view.spawnHearts(2)
+                say(Dialogue.peekaboo.randomElement() ?? "Peekaboo!")
+            }
+        case .none:
+            view.mood = .idle
+        }
+    }
+
+    // MARK: Two pets
+
+    /// Now and then, run over to the other pet to say hi.
+    private func maybeVisit(_ now: Date) {
+        guard now >= nextVisit else { return }
+        nextVisit = now.addingTimeInterval(.random(in: 45...120))
+        guard let b = buddy, canAct, b.canAct, action != .sleep, b.action != .sleep, !userAway,
+              media != .call, !focusing, treat == nil, ball == nil, b.treat == nil, b.ball == nil,
+              surface == .floor, b.surface == .floor, platform.id == b.platform.id else { return }
+        apply(Decision(action: .visit, duration: 9))
+    }
+
+    private func visitBuddy(_ dt: CGFloat, _ f: NSRect) {
+        guard let b = buddy, b.surface == .floor, b.platform.id == platform.id, b.canAct else {
+            action = .idle
+            remaining = 1
+            return
+        }
+        let d = b.cx - cx
+        if abs(d) > 64 * scale {
+            facing = d > 0 ? 1 : -1
+            view.mood = .chase
+            advance(chaseSpeed * 0.85 * dt, autonomous: false, f)
+            return
+        }
+        // Met up: both are delighted.
+        facing = d > 0 ? 1 : -1
+        action = .happy
+        remaining = 2
+        view.spawnHearts(3)
+        say(Dialogue.buddyHello(b.species.name).randomElement() ?? "Hi!")
+        b.greeted(from: cx)
+        mind.reunitedWithBuddy()
+    }
+
+    /// The other pet just ran over to say hi.
+    private func greeted(from x: CGFloat) {
+        guard canAct, action != .sleep else { return }
+        facing = x > cx ? 1 : -1
+        action = .happy
+        remaining = 2
+        view.spawnHearts(3)
+        nextVisit = max(nextVisit, Date().addingTimeInterval(40))
     }
 
     /// Distance from the pet to the cursor along the current surface's axis.
@@ -1119,6 +1483,11 @@ final class PetController {
     }
 
     private func floorEnd(_ f: NSRect, left: Bool, _ s: CGFloat) {
+        if hidePhase == .going {
+            hidePhase = .hidden                             // reached the edge: duck behind it
+            remaining = .random(in: 6...10)
+            return
+        }
         if platform.id == 0 {
             if settings.climbEdges && (forceClimb || Double.random(in: 0..<1) < 0.5) {
                 forceClimb = false
@@ -1155,10 +1524,11 @@ final class PetController {
                           hour: hour,
                           platformAbove: surface == .floor && windowPlatforms.contains { reachable($0, feet: feet) },
                           canClimb: surface == .floor && platform.id == 0 && settings.climbEdges,
+                          canHide: surface == .floor && platform.id == 0 && NSScreen.screens.count == 1,
                           media: media,
                           userAway: userAway,
-                          focusing: focusEnds != nil,
-                          species: settings.species,
+                          focusing: focusing,
+                          species: species,
                           energy: mind.energy,
                           fullness: mind.fullness,
                           joy: mind.joy,

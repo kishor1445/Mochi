@@ -24,6 +24,9 @@ final class PetView: NSView {
     var spin: CGFloat = 0                // extra twirl / wobble around the pet's own centre
     var gaze: CGPoint = .zero            // where the eyes look (local coordinates)
     var musicBpm: CGFloat = 0            // > 0 while music plays: headphones + bobbing to the beat
+    var outfit: Outfit = .none           // what the pet is wearing
+    var sweat = false                    // the Mac is working hard
+    var shiver = false                   // the battery is nearly empty
     var tap: CGFloat = 0                 // 1 right after a key press, fades fast: a little bop while you type
     var isPreview = false                // settings-panel mini version
 
@@ -69,6 +72,7 @@ final class PetView: NSView {
     }
 
     private func previewTick() {
+        guard window?.isVisible == true, window?.occlusionState.contains(.visible) == true else { return }
         advance(1.0 / 30.0)
         let phase = fmod(time, 12)
         if phase < 4 { mood = .idle } else if phase < 7 { mood = .walk }
@@ -101,6 +105,7 @@ final class PetView: NSView {
         ctx.saveGState()
         ctx.scaleBy(x: bounds.width / Self.side, y: bounds.height / Self.side)
         ctx.saveGState()
+        if shiver, mood != .sleep { ctx.translateBy(x: sin(time * 46) * 1.1, y: 0) }
         ctx.translateBy(x: Self.canvas.midX, y: Self.canvas.midY)
         ctx.rotate(by: angle)
         ctx.translateBy(x: -Self.canvas.midX, y: -Self.canvas.midY)
@@ -203,6 +208,8 @@ final class PetView: NSView {
         if sp == .bunny { drawBow(ctx, body) }
 
         drawFace(body)
+        drawOutfit(ctx, body)
+        if sweat, mood != .sleep { drawSweat(body) }
         if musicBpm > 0 { drawHeadphones(body) }
         if mood == .sleep { drawZs(near: body) }
         if mood == .dance || (musicBpm > 0 && mood != .sleep) { drawNotes(near: body) }
@@ -608,6 +615,20 @@ final class PetView: NSView {
             }
         }
 
+        if outfit == .glasses {
+            let frame = NSColor(calibratedRed: 0.24, green: 0.20, blue: 0.30, alpha: 1)
+            for dx in [CGFloat(-1), 1] {
+                let lens = NSBezierPath(ovalIn: NSRect(x: fx + dx * spread - 8, y: eyeY - 8, width: 16, height: 16))
+                NSColor.white.withAlphaComponent(0.18).setFill(); lens.fill()
+                frame.setStroke(); lens.lineWidth = 1.7; lens.stroke()
+            }
+            let bridge = NSBezierPath()
+            bridge.move(to: NSPoint(x: fx - spread + 8, y: eyeY + 1))
+            bridge.curve(to: NSPoint(x: fx + spread - 8, y: eyeY + 1),
+                         controlPoint1: NSPoint(x: fx - 2, y: eyeY + 3.5), controlPoint2: NSPoint(x: fx + 2, y: eyeY + 3.5))
+            bridge.lineWidth = 1.7; frame.setStroke(); bridge.stroke()
+        }
+
         // Mouth / beak, tucked in close under the eyes
         ink.setFill(); ink.setStroke()
         switch sp {
@@ -674,6 +695,96 @@ final class PetView: NSView {
             if open { openMouth(NSPoint(x: fx, y: eyeY - 11), 8, 9) }
             else if sad { arc(NSPoint(x: fx, y: eyeY - 12.5), 3, 25, 155) }
             else { arc(NSPoint(x: fx, y: eyeY - 5.5), 3, 205, 335) }
+        }
+    }
+
+    // MARK: Outfits
+
+    /// Things worn on the head (glasses are drawn with the face, where the eye positions are known).
+    private func drawOutfit(_ ctx: CGContext, _ body: NSRect) {
+        let top = NSPoint(x: body.midX + facing * 2, y: body.maxY)
+        let line = NSColor(calibratedRed: 0.36, green: 0.26, blue: 0.30, alpha: 1)
+        switch outfit {
+        case .none, .glasses:
+            break
+
+        case .flower:
+            // tucked behind one ear, on the side away from where the pet is looking
+            let c = NSPoint(x: body.midX - facing * body.width * 0.30, y: body.maxY - body.height * 0.13)
+            let petal = NSColor(calibratedRed: 1.00, green: 0.62, blue: 0.76, alpha: 1)
+            for i in 0..<5 {
+                let a = CGFloat(i) * 2 * .pi / 5 + .pi / 2
+                let r = NSRect(x: c.x + cos(a) * 4.6 - 3.8, y: c.y + sin(a) * 4.6 - 3.8, width: 7.6, height: 7.6)
+                let p = NSBezierPath(ovalIn: r)
+                petal.setFill(); p.fill()
+                NSColor(calibratedRed: 0.80, green: 0.36, blue: 0.52, alpha: 1).setStroke(); p.lineWidth = 1; p.stroke()
+            }
+            NSColor(calibratedRed: 1.00, green: 0.84, blue: 0.30, alpha: 1).setFill()
+            NSBezierPath(ovalIn: NSRect(x: c.x - 2.8, y: c.y - 2.8, width: 5.6, height: 5.6)).fill()
+
+        case .partyHat:
+            ctx.saveGState()
+            ctx.translateBy(x: top.x, y: top.y - 4)
+            ctx.rotate(by: -facing * 0.16)
+            let cone = NSBezierPath()
+            cone.move(to: NSPoint(x: -10, y: 0)); cone.line(to: NSPoint(x: 0, y: 23)); cone.line(to: NSPoint(x: 10, y: 0))
+            cone.close(); cone.lineJoinStyle = .round
+            NSColor(calibratedRed: 1.00, green: 0.55, blue: 0.68, alpha: 1).setFill(); cone.fill()
+            NSGraphicsContext.saveGraphicsState()
+            cone.addClip()
+            NSColor(calibratedRed: 1.00, green: 0.86, blue: 0.36, alpha: 1).setStroke()
+            for y in [CGFloat(5), 12, 19] {
+                let stripe = NSBezierPath()
+                stripe.move(to: NSPoint(x: -12, y: y - 3)); stripe.line(to: NSPoint(x: 12, y: y + 2))
+                stripe.lineWidth = 2.6; stripe.stroke()
+            }
+            NSGraphicsContext.restoreGraphicsState()
+            line.setStroke(); cone.lineWidth = 1.8; cone.stroke()
+            let pom = NSBezierPath(ovalIn: NSRect(x: -4, y: 20, width: 8, height: 8))
+            NSColor.white.setFill(); pom.fill()
+            line.setStroke(); pom.lineWidth = 1.5; pom.stroke()
+            ctx.restoreGState()
+
+        case .crown:
+            ctx.saveGState()
+            ctx.translateBy(x: top.x, y: top.y - 3)
+            ctx.rotate(by: -facing * 0.08)
+            let crown = NSBezierPath()
+            crown.move(to: NSPoint(x: -12, y: 0))
+            for (x, y) in [(CGFloat(-13), CGFloat(13)), (-6.5, 6), (0, 15), (6.5, 6), (13, 13), (12, 0)] {
+                crown.line(to: NSPoint(x: x, y: y))
+            }
+            crown.close(); crown.lineJoinStyle = .round
+            NSColor(calibratedRed: 1.00, green: 0.82, blue: 0.30, alpha: 1).setFill(); crown.fill()
+            NSColor(calibratedRed: 0.74, green: 0.50, blue: 0.10, alpha: 1).setStroke(); crown.lineWidth = 1.8; crown.stroke()
+            for (x, c) in [(CGFloat(-6.5), NSColor.systemTeal), (0, NSColor.systemPink), (6.5, NSColor.systemTeal)] {
+                c.setFill()
+                NSBezierPath(ovalIn: NSRect(x: x - 1.8, y: 1.6, width: 3.6, height: 3.6)).fill()
+            }
+            ctx.restoreGState()
+
+        case .halo:
+            let bob = sin(time * 2.2) * 1.5
+            let ring = NSBezierPath(ovalIn: NSRect(x: top.x - 14, y: top.y + 7 + bob, width: 28, height: 8))
+            ring.lineWidth = 4.5
+            NSColor(calibratedRed: 0.80, green: 0.60, blue: 0.14, alpha: 0.9).setStroke(); ring.stroke()
+            ring.lineWidth = 2.6
+            NSColor(calibratedRed: 1.00, green: 0.90, blue: 0.45, alpha: 1).setStroke(); ring.stroke()
+        }
+    }
+
+    /// Two drops of sweat sliding down the side of the head.
+    private func drawSweat(_ body: NSRect) {
+        for i in 0..<2 {
+            let phase = fmod(time * 0.8 + CGFloat(i) * 0.5, 1)
+            let x = body.maxX - 4 + CGFloat(i) * 5
+            let y = body.maxY - 6 - phase * 16
+            let drop = NSBezierPath()
+            drop.move(to: NSPoint(x: x, y: y + 6))
+            drop.curve(to: NSPoint(x: x, y: y - 3), controlPoint1: NSPoint(x: x + 4.5, y: y), controlPoint2: NSPoint(x: x + 3, y: y - 3))
+            drop.curve(to: NSPoint(x: x, y: y + 6), controlPoint1: NSPoint(x: x - 3, y: y - 3), controlPoint2: NSPoint(x: x - 4.5, y: y))
+            NSColor(calibratedRed: 0.52, green: 0.78, blue: 1.0, alpha: 1 - phase).setFill(); drop.fill()
+            NSColor(calibratedRed: 0.25, green: 0.50, blue: 0.85, alpha: 1 - phase).setStroke(); drop.lineWidth = 1; drop.stroke()
         }
     }
 

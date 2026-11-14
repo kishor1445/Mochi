@@ -38,6 +38,17 @@ enum Render {
             let img = NSImage(size: v.bounds.size); img.addRepresentation(rep)
             img.draw(at: NSPoint(x: CGFloat(i) * cell, y: 0), from: .zero, operation: .sourceOver, fraction: 1)
         }
+        // right of the headphones row: every outfit, and a sweating pet
+        let extras: [(Species, Outfit, Bool)] = [(.mochi, .flower, false), (.cat, .glasses, false), (.bunny, .partyHat, false),
+                                                 (.penguin, .crown, false), (.ghost, .halo, false), (.mochi, .none, true)]
+        for (i, e) in extras.enumerated() {
+            let v = PetView(frame: NSRect(origin: .zero, size: PetView.size))
+            v.species = e.0; v.outfit = e.1; v.sweat = e.2; v.mood = .idle; v.time = 0.6
+            let rep = v.bitmapImageRepForCachingDisplay(in: v.bounds)!
+            v.cacheDisplay(in: v.bounds, to: rep)
+            let img = NSImage(size: v.bounds.size); img.addRepresentation(rep)
+            img.draw(at: NSPoint(x: i >= 5 ? 5 * cell : CGFloat(i + 4) * cell, y: i >= 5 ? 0 : cell), from: .zero, operation: .sourceOver, fraction: 1)
+        }
         sheet.unlockFocus()
         if let tiff = sheet.tiffRepresentation, let rep = NSBitmapImageRep(data: tiff),
            let png = rep.representation(using: .png, properties: [:]) {
@@ -58,6 +69,10 @@ extension Render {
                  to: path.replacingOccurrences(of: ".png", with: "-behavior.png"))
         snapshot(GeneralTab(settings: s, onBringBack: {}).frame(width: size.width, height: size.height),
                  to: path.replacingOccurrences(of: ".png", with: "-general.png"))
+        snapshot(RemindersTab(settings: s).frame(width: size.width, height: size.height),
+                 to: path.replacingOccurrences(of: ".png", with: "-reminders.png"))
+        snapshot(TodayTab(log: .shared).frame(width: size.width, height: size.height),
+                 to: path.replacingOccurrences(of: ".png", with: "-today.png"))
         snapshot(MenuHeader(mind: .shared, species: s.species), to: path.replacingOccurrences(of: ".png", with: "-menu.png"))
     }
 

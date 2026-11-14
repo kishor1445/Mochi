@@ -13,6 +13,7 @@
 - Smaller pet by default, with a Small / Medium / Large size setting
 - Tidier menu: a compact status card, treat and play up top, the rest grouped under Interact and Focus Session
 - Settings reorganized into three tabs: Pet, Behavior and General
+- Typing reactions: the pet bops with each key press and cheers on long or fast typing streaks (it only counts key presses, never reads them, and needs no permission)
 - Speech bubbles scale with the pet size
 - Fix: the pet no longer floats above the screen bottom when the Dock is hidden but macOS still reserves its space
 - Every pet redrawn to be cuter: chubbier bodies with soft shading, bigger sparkly eyes, rosier cheeks, tiny mouths with tongues, paws in front, plus a bow for Clover, a feather tuft and heart-shaped face for Pip, and a cream-tipped tail for Miso

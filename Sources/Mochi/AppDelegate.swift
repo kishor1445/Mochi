@@ -4,6 +4,8 @@ import SwiftUI
 
 final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var pet: PetController!
+    private var companion: PetController?
+    private var pauseReasons = Set<String>()
     private var settingsWindow: SettingsWindowController!
     private var statusItem: NSStatusItem!
     private var cancellables = Set<AnyCancellable>()
@@ -25,10 +27,86 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             self?.statusItem.button?.title = s.emoji
         }.store(in: &cancellables)
 
+        // Second pet: comes and goes with the setting.
+        PetSettings.shared.$secondPet.receive(on: DispatchQueue.main).sink { [weak self] on in
+            self?.setCompanion(on)
+        }.store(in: &cancellables)
+
+        // Calendar alerts need permission the first time they are switched on.
+        PetSettings.shared.$calendarAlerts.dropFirst().receive(on: DispatchQueue.main).sink { [weak self] on in
+            guard on, let self else { return }
+            self.pet.enableCalendar { ok in
+                guard !ok else { return }
+                PetSettings.shared.calendarAlerts = false
+                self.pet.say("I need calendar access for that. Allow Mochi in System Settings › Privacy › Calendars.",
+                             force: true, seconds: 8)
+            }
+        }.store(in: &cancellables)
+
+        watchPower()
         if CommandLine.arguments.contains("--settings") { settingsWindow.show() }
     }
 
+    private func setCompanion(_ on: Bool) {
+        if on, companion == nil {
+            let c = PetController(isMain: false)
+            c.buddy = pet
+            pet.buddy = c
+            c.setContextMenu(makeMenu())
+            c.start()
+            pauseReasons.forEach { c.pause($0) }
+            companion = c
+        } else if !on, let c = companion {
+            c.stop()
+            pet.buddy = nil
+            companion = nil
+        }
+    }
+
+    // MARK: Power
+
+    /// Nothing animates or polls while the Mac sleeps, the display is off, the screen is locked,
+    /// or another user is logged in. This is what keeps Mochi off the battery when you are away.
+    private func watchPower() {
+        let ws = NSWorkspace.shared.notificationCenter
+        let events: [(Notification.Name, String, Bool)] = [
+            (NSWorkspace.willSleepNotification, "sleep", true),
+            (NSWorkspace.didWakeNotification, "sleep", false),
+            (NSWorkspace.screensDidSleepNotification, "display", true),
+            (NSWorkspace.screensDidWakeNotification, "display", false),
+            (NSWorkspace.sessionDidResignActiveNotification, "session", true),
+            (NSWorkspace.sessionDidBecomeActiveNotification, "session", false)
+        ]
+        for (name, reason, pausing) in events {
+            ws.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
+                self?.setPaused(pausing, reason)
+            }
+        }
+        let dc = DistributedNotificationCenter.default()
+        dc.addObserver(forName: Notification.Name("com.apple.screenIsLocked"), object: nil, queue: .main) { [weak self] _ in
+            self?.setPaused(true, "lock")
+        }
+        dc.addObserver(forName: Notification.Name("com.apple.screenIsUnlocked"), object: nil, queue: .main) { [weak self] _ in
+            self?.setPaused(false, "lock")
+        }
+    }
+
+    private func setPaused(_ paused: Bool, _ reason: String) {
+        if paused {
+            pauseReasons.insert(reason)
+            pet.pause(reason)
+            companion?.pause(reason)
+            AudioWatcher.shared.pause()
+        } else {
+            pauseReasons.remove(reason)
+            pet.resume(reason)
+            companion?.resume(reason)
+            if pauseReasons.isEmpty { AudioWatcher.shared.resume() }
+        }
+    }
+
     func applicationWillTerminate(_ notification: Notification) {
+        DailyLog.shared.publish()
         PetMind.shared.save()
     }
 
@@ -59,7 +137,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             item("Pet \(name)", "heart", #selector(petIt)),
             item("Come Here", "cursorarrow.rays", #selector(comeHere)),
             item("Do a Trick", "sparkles", #selector(trick)),
-            item("Go to Sleep", "moon.zzz", #selector(sleepNow))
+            item("Go to Sleep", "moon.zzz", #selector(sleepNow)),
+            item("Daily Check-in", "chart.bar", #selector(checkIn))
         ]))
         if let left = pet.focusMinutesLeft {
             menu.addItem(item("Stop Focus (\(left) min left)", "timer", #selector(stopFocus)))
@@ -98,6 +177,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     @objc private func petIt() { pet.petted() }
     @objc private func comeHere() { pet.comeHere() }
     @objc private func sleepNow() { pet.sleepNow() }
+    @objc private func checkIn() { pet.checkIn() }
     @objc private func trick() { pet.trick() }
     @objc private func giveTreat() { pet.giveTreat() }
     @objc private func playBall() { pet.playBall() }

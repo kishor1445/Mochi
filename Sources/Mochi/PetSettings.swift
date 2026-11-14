@@ -58,6 +58,39 @@ enum PetSize: String, CaseIterable, Identifiable {
     }
 }
 
+/// The gentle nudges the pet can give while you work.
+enum ReminderKind: String, CaseIterable, Identifiable {
+    case water, posture, eyes
+
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .water: return "Drink water"
+        case .posture: return "Check my posture"
+        case .eyes: return "Rest my eyes"
+        }
+    }
+
+    var symbol: String {
+        switch self {
+        case .water: return "drop"
+        case .posture: return "figure.stand"
+        case .eyes: return "eye"
+        }
+    }
+
+    var defaultMinutes: Int {
+        switch self {
+        case .water: return 60
+        case .posture: return 45
+        case .eyes: return 20
+        }
+    }
+
+    static let intervals = [15, 20, 30, 45, 60, 90, 120]
+}
+
 /// User preferences, saved automatically to UserDefaults.
 final class PetSettings: ObservableObject {
     static let shared = PetSettings()
@@ -71,10 +104,23 @@ final class PetSettings: ObservableObject {
     @Published var followCursor: Bool { didSet { d.set(followCursor, forKey: "followCursor") } }
     @Published var reactToMedia: Bool { didSet { d.set(reactToMedia, forKey: "reactToMedia") } }
     @Published var reactToTyping: Bool { didSet { d.set(reactToTyping, forKey: "reactToTyping") } }
+    @Published var secondPet: Bool { didSet { d.set(secondPet, forKey: "secondPet") } }
+    @Published var companionSpecies: Species { didSet { d.set(companionSpecies.rawValue, forKey: "companionSpecies") } }
+    @Published var outfit: Outfit { didSet { d.set(outfit.rawValue, forKey: "outfit") } }
+    @Published var dailyCheckIn: Bool { didSet { d.set(dailyCheckIn, forKey: "dailyCheckIn") } }
+    @Published var calendarAlerts: Bool { didSet { d.set(calendarAlerts, forKey: "calendarAlerts") } }
+    /// Minutes between each gentle reminder; 0 = off.
+    @Published var reminderMinutes: [String: Int] { didSet { d.set(reminderMinutes, forKey: "reminderMinutes") } }
     @Published var breakReminders: Bool { didSet { d.set(breakReminders, forKey: "breakReminders") } }
     @Published var systemAware: Bool { didSet { d.set(systemAware, forKey: "systemAware") } }
     /// Mirrors the system's login item (not stored here: macOS owns it).
     @Published var launchAtLogin = LoginItem.enabled
+
+    /// Minutes between reminders of this kind, or nil when it is off.
+    func interval(_ kind: ReminderKind) -> Int? {
+        let m = reminderMinutes[kind.rawValue] ?? 0
+        return m > 0 ? m : nil
+    }
 
     private init() {
         species = Species(rawValue: d.string(forKey: "species") ?? "") ?? .mochi
@@ -85,6 +131,12 @@ final class PetSettings: ObservableObject {
         followCursor = d.object(forKey: "followCursor") as? Bool ?? true
         reactToMedia = d.object(forKey: "reactToMedia") as? Bool ?? true
         reactToTyping = d.object(forKey: "reactToTyping") as? Bool ?? true
+        secondPet = d.object(forKey: "secondPet") as? Bool ?? false
+        companionSpecies = Species(rawValue: d.string(forKey: "companionSpecies") ?? "") ?? .cat
+        outfit = Outfit(rawValue: d.string(forKey: "outfit") ?? "") ?? .none
+        dailyCheckIn = d.object(forKey: "dailyCheckIn") as? Bool ?? true
+        calendarAlerts = d.object(forKey: "calendarAlerts") as? Bool ?? false
+        reminderMinutes = d.dictionary(forKey: "reminderMinutes") as? [String: Int] ?? [ReminderKind.water.rawValue: 60]
         breakReminders = d.object(forKey: "breakReminders") as? Bool ?? true
         systemAware = d.object(forKey: "systemAware") as? Bool ?? true
     }

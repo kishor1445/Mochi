@@ -15,6 +15,21 @@ enum SystemInfo {
         CGEventSource.counterForEventType(.combinedSessionState, eventType: .keyDown)
     }
 
+    /// Cumulative CPU time since boot as (busy, total) ticks. Compare two samples to get the load.
+    static func cpuTicks() -> (busy: Double, total: Double)? {
+        var info = host_cpu_load_info()
+        var count = mach_msg_type_number_t(MemoryLayout<host_cpu_load_info>.stride / MemoryLayout<integer_t>.stride)
+        let result = withUnsafeMutablePointer(to: &info) {
+            $0.withMemoryRebound(to: integer_t.self, capacity: Int(count)) {
+                host_statistics(mach_host_self(), HOST_CPU_LOAD_INFO, $0, &count)
+            }
+        }
+        guard result == KERN_SUCCESS else { return nil }
+        let user = Double(info.cpu_ticks.0), system = Double(info.cpu_ticks.1)
+        let idle = Double(info.cpu_ticks.2), nice = Double(info.cpu_ticks.3)
+        return (user + system + nice, user + system + nice + idle)
+    }
+
     /// Internal battery level and whether it's charging (nil on Macs without a battery).
     static func battery() -> (level: Int, charging: Bool)? {
         guard let info = IOPSCopyPowerSourcesInfo()?.takeRetainedValue(),

@@ -101,6 +101,11 @@ final class SpeechBubble {
         window.contentView = view
     }
 
+    func hide() {
+        visible = false
+        window.orderOut(nil)
+    }
+
     /// Call after `BubbleView.scale` changes so a bubble that is already showing is re-measured.
     func rescale() {
         size = BubbleView.windowSize(for: view.text)
@@ -131,7 +136,8 @@ final class SpeechBubble {
 
         view.tailOnTop = below
         view.tailX = min(max(centerX - x, 18 * BubbleView.scale), size.width - 18 * BubbleView.scale)
-        window.setFrame(NSRect(x: x, y: y, width: size.width, height: size.height), display: true)
+        let frame = NSRect(x: x, y: y, width: size.width, height: size.height)
+        if frame != window.frame { window.setFrame(frame, display: true) }
         if !window.isVisible { window.orderFrontRegardless() }
     }
 }

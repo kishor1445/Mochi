@@ -13,6 +13,9 @@ enum MediaActivity: Equatable {
 /// Notices which apps are playing audio, using Core Audio's process list.
 /// This needs no permission and never hears the audio itself, it only sees that an app is outputting sound.
 final class AudioWatcher {
+    /// One watcher for the whole app, however many pets are on screen.
+    static let shared = AudioWatcher()
+    private var started = false
     private(set) var current: MediaActivity = .none
     private var candidate: MediaActivity = .none
     private var streak = 0
@@ -23,6 +26,8 @@ final class AudioWatcher {
     private var playing: [String: Bool] = [:]
 
     func start() {
+        guard !started else { resume(); return }
+        started = true
         let center = DistributedNotificationCenter.default()
         center.addObserver(forName: Notification.Name("com.spotify.client.PlaybackStateChanged"),
                            object: nil, queue: .main) { [weak self] n in self?.record("spotify", n) }
@@ -33,6 +38,20 @@ final class AudioWatcher {
         }
 
         let t = Timer(timeInterval: 1, repeats: true) { [weak self] _ in self?.poll() }
+        RunLoop.main.add(t, forMode: .common)
+        timer = t
+    }
+
+    /// Stop polling while the Mac sleeps or the screen is locked.
+    func pause() {
+        timer?.invalidate()
+        timer = nil
+    }
+
+    func resume() {
+        guard started, timer == nil else { return }
+        let t = Timer(timeInterval: 1, repeats: true) { [weak self] _ in self?.poll() }
+        t.tolerance = 0.3
         RunLoop.main.add(t, forMode: .common)
         timer = t
     }

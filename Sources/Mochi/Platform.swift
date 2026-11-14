@@ -15,6 +15,31 @@ enum WindowScanner {
     /// the Dock's strip even when something hides the Dock (a hider utility, some full-size windows),
     /// which would leave the pet standing on thin air.
     static func dockIsShowing() -> Bool {
+        let now = Date()
+        if now.timeIntervalSince(dockChecked) < 1.5 { return dockShowing }
+        dockChecked = now
+        dockShowing = readDockIsShowing()
+        return dockShowing
+    }
+
+    // Asking the window server for every window is the most expensive thing Mochi does,
+    // so results are cached briefly and shared by every pet on screen.
+    private static var dockChecked = Date.distantPast
+    private static var dockShowing = true
+    private static var scanned = Date.distantPast
+    private static var scannedFrame = NSRect.zero
+    private static var scannedPlatforms: [Platform] = []
+
+    static func platforms(in f: NSRect) -> [Platform] {
+        let now = Date()
+        if now.timeIntervalSince(scanned) < 0.45, f == scannedFrame { return scannedPlatforms }
+        scanned = now
+        scannedFrame = f
+        scannedPlatforms = readPlatforms(in: f)
+        return scannedPlatforms
+    }
+
+    private static func readDockIsShowing() -> Bool {
         guard let list = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements],
                                                     kCGNullWindowID) as? [[String: Any]] else { return true }
         let dockLevel = Int(CGWindowLevelForKey(.dockWindow))
@@ -28,7 +53,7 @@ enum WindowScanner {
         }
     }
 
-    static func platforms(in f: NSRect) -> [Platform] {
+    private static func readPlatforms(in f: NSRect) -> [Platform] {
         guard let list = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements],
                                                     kCGNullWindowID) as? [[String: Any]] else { return [] }
         let primaryHeight = NSScreen.screens.first?.frame.height ?? f.maxY

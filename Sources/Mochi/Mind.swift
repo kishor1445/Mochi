@@ -145,6 +145,7 @@ final class PetMind: ObservableObject {
     func played() { joy += 0.25; energy -= 0.08; addBond(5); clampAll() }
     func enjoyedMusic(_ dt: TimeInterval) { joy += dt / 900; clampAll() }
     func focusedTogether() { joy += 0.1; addBond(6); clampAll() }
+    func reunitedWithBuddy() { joy += 0.04; clampAll() }
     func reunited() { joy += 0.15; addBond(2); clampAll() }
 
     func save() {

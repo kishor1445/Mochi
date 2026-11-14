@@ -50,6 +50,7 @@ Switch pets any time from the Pet tab in settings:
 - **Videos** (QuickTime, VLC, IINA, ...): settles down to watch ("Movie time! 🍿")
 - **Calls** (Zoom, Teams, FaceTime, Discord, ...): goes quiet and still
 - **Anything else making sound** (browsers, etc.): bobs along and sometimes dances
+- **Typing**: bops along with every key you press and cheers when you're on a roll or typing fast. It only reads the system's running count of key presses, never which keys
 - Falls asleep when you step away, and welcomes you back when you return
 - Reminds you to stretch after about 50 minutes of work, comments on low battery, plugging in and mealtimes
 
@@ -123,7 +124,7 @@ Sources/Mochi
 ├── SpeechBubble.swift     the speech bubble window
 ├── Platform.swift         finds window tops to stand on
 ├── AudioWatcher.swift     notices which apps are playing sound (music / video / call)
-├── SystemInfo.swift       idle time and battery
+├── SystemInfo.swift       idle time, battery and the key press count
 ├── Treat.swift            the snack and the ball you can drop for the pet
 ├── LoginItem.swift        launch at login
 ├── PetSettings.swift      saved preferences (UserDefaults)

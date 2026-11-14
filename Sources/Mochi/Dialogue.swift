@@ -67,6 +67,39 @@ enum Dialogue {
     static let typingLong = ["So productive today! 💪", "Still going! You're unstoppable.", "That's a lot of typing. Proud of you 💖"]
     static let typingFast = ["Whoa, fast fingers! ⌨️", "Speedy!! 💨", "Are your keys okay?! 🔥"]
 
+    // Being thrown
+    static let thrown = ["Wheeeee!", "I can flyyy!", "Yeet!!", "Not agaaain!"]
+    static let crashLanded = ["Again! Again! 😵‍💫", "The room is spinning…", "Ten out of ten landing.", "Whoa… do that again!"]
+
+    // Hide and peek
+    static let peekaboo = ["Peekaboo! 👀", "Boo! Found you!", "You can't see me… oh.", "Hehe, I was hiding!"]
+
+    // Two pets
+    static func buddyHello(_ name: String) -> [String] {
+        ["Hi \(name)!", "Tag, you're it!", "\(name)! Play with me!", "Boop!", "Best buddies! 💕"]
+    }
+
+    // Outfits
+    static func newOutfit(_ o: Outfit) -> String { "Ooh, I can wear a \(o.label.lowercased()) now! ✨" }
+
+    // Gentle reminders
+    static func reminder(_ kind: ReminderKind) -> [String] {
+        switch kind {
+        case .water: return ["Time for a sip of water 💧", "Water break! 💧", "Stay hydrated, okay? 💧"]
+        case .posture: return ["Shoulders down, back straight 🧍", "How's your posture? 🧍", "Sit up tall with me!"]
+        case .eyes: return ["Look at something far away for 20 seconds 👀", "Rest your eyes a moment 👀", "Blink! And look out the window 🌳"]
+        }
+    }
+
+    // Busy Mac
+    static let busyMac = ["Phew, your Mac is working hard! 🥵", "So… much… computing…", "Is something heavy running? 💦"]
+    static let hotMac = ["It's getting warm in here 🔥", "Your Mac is running hot. Give it a moment? 🌡"]
+
+    // Calendar
+    static func meeting(_ title: String, minutes: Int) -> String {
+        minutes == 0 ? "📅 \(title) is starting now!" : "📅 \(title) in \(minutes) min!"
+    }
+
     // Focus sessions
     static let focusStart = ["Focus time! I'll keep quiet 🤫", "You've got this! I'll be right here.", "Let's do this! 💪"]
     static let focusDone = ["Focus done! Great work 🎉 Time for a break.", "You did it! 🎉 Stretch a little?", "All done! Proud of you 💖"]

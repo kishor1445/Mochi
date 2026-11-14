@@ -150,6 +150,7 @@ struct PetTab: View {
                 }
             }
             StatusCard(mind: .shared, species: settings.species)
+            WardrobeRow(settings: settings, mind: .shared)
             HStack(spacing: 8) {
                 Button(action: onTreat) { Label("Give a treat", systemImage: "gift") }
                 Button(action: onPlay) { Label("Play ball", systemImage: "soccerball") }
@@ -159,6 +160,39 @@ struct PetTab: View {
             Spacer(minLength: 0)
         }
         .padding(20)
+    }
+}
+
+/// Outfit and second-pet choices, side by side under the status card.
+struct WardrobeRow: View {
+    @ObservedObject var settings: PetSettings
+    @ObservedObject var mind: PetMind
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 12) {
+            VStack(alignment: .leading, spacing: 4) {
+                Picker("Outfit", selection: $settings.outfit) {
+                    ForEach(Outfit.unlocked(at: mind.level)) { Text($0.label).tag($0) }
+                }
+                .frame(width: 190)
+                if let next = Outfit.next(after: mind.level) {
+                    Text("\(next.label) unlocks at bond level \(next.unlockLevel)")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+            }
+            Spacer()
+            VStack(alignment: .trailing, spacing: 4) {
+                Toggle("Second pet", isOn: $settings.secondPet)
+                    .toggleStyle(.switch)
+                    .controlSize(.small)
+                if settings.secondPet {
+                    Picker("Friend", selection: $settings.companionSpecies) {
+                        ForEach(Species.allCases) { Text("\($0.emoji) \($0.name)").tag($0) }
+                    }
+                    .frame(width: 160)
+                }
+            }
+        }
     }
 }
 
@@ -174,14 +208,132 @@ struct BehaviorTab: View {
                 Toggle("Climb screen edges and hang from the top", isOn: $settings.climbEdges)
                 Toggle("Chase my cursor sometimes", isOn: $settings.followCursor)
             }
-            Section("Paying attention") {
+            Section {
                 Toggle("React to music, videos and calls", isOn: $settings.reactToMedia)
                 Toggle("Bop along while I type", isOn: $settings.reactToTyping)
-                Toggle("Remind me to take a break", isOn: $settings.breakReminders)
-                Toggle("Comment on battery and time of day", isOn: $settings.systemAware)
+                Toggle("Comment on battery, time of day and a busy Mac", isOn: $settings.systemAware)
+            } header: {
+                Text("Paying attention")
+            } footer: {
+                Text("Typing is only counted, never read. Nothing leaves your Mac.")
+                    .font(.caption).foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
         .formStyle(.grouped)
+    }
+}
+
+// MARK: Reminders tab
+
+struct RemindersTab: View {
+    @ObservedObject var settings: PetSettings
+
+    private func isOn(_ k: ReminderKind) -> Binding<Bool> {
+        Binding(get: { settings.interval(k) != nil },
+                set: { settings.reminderMinutes[k.rawValue] = $0 ? k.defaultMinutes : 0 })
+    }
+
+    private func minutes(_ k: ReminderKind) -> Binding<Int> {
+        Binding(get: { settings.interval(k) ?? k.defaultMinutes },
+                set: { settings.reminderMinutes[k.rawValue] = $0 })
+    }
+
+    var body: some View {
+        Form {
+            Section {
+                ForEach(ReminderKind.allCases) { kind in
+                    HStack {
+                        Label(kind.label, systemImage: kind.symbol)
+                        Spacer()
+                        if settings.interval(kind) != nil {
+                            Picker("Every", selection: minutes(kind)) {
+                                ForEach(ReminderKind.intervals, id: \.self) { Text("every \($0) min").tag($0) }
+                            }
+                            .labelsHidden()
+                            .frame(width: 130)
+                        }
+                        Toggle(kind.label, isOn: isOn(kind)).labelsHidden()
+                    }
+                }
+                Toggle(isOn: $settings.breakReminders) {
+                    Label("Stretch after 50 minutes of work", systemImage: "figure.cooldown")
+                }
+            } header: {
+                Text("Gentle reminders")
+            } footer: {
+                Text("Reminders count time you are at your Mac, and wait while you are on a call or in a focus session.")
+                    .font(.caption).foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            Section {
+                Toggle(isOn: $settings.calendarAlerts) {
+                    Label("Warn me 5 minutes before calendar events", systemImage: "calendar")
+                }
+                Toggle(isOn: $settings.dailyCheckIn) {
+                    Label("Daily check-in at 6 pm and the next morning", systemImage: "chart.bar")
+                }
+            } header: {
+                Text("Your day")
+            } footer: {
+                Text("Calendar alerts ask macOS for access the first time. Event titles are only shown in the bubble.")
+                    .font(.caption).foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+        .formStyle(.grouped)
+    }
+}
+
+// MARK: Today tab
+
+struct StatTile: View {
+    let symbol: String
+    let value: String
+    let label: String
+    let tint: Color
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Image(systemName: symbol).font(.system(size: 15)).foregroundStyle(tint).frame(height: 18)
+            Text(value).font(.system(size: 20, weight: .semibold, design: .rounded))
+            Text(label).font(.caption).foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(12)
+        .background(RoundedRectangle(cornerRadius: 12).fill(Color.primary.opacity(0.04)))
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(label): \(value)")
+    }
+}
+
+struct TodayTab: View {
+    @ObservedObject var log: DailyLog
+
+    var body: some View {
+        let t = log.today
+        VStack(alignment: .leading, spacing: 12) {
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 3), spacing: 10) {
+                StatTile(symbol: "desktopcomputer", value: DayStats.minutes(t.activeSeconds), label: "At your Mac", tint: .blue)
+                StatTile(symbol: "keyboard", value: DayStats.minutes(t.typingSeconds), label: "Typing", tint: .indigo)
+                StatTile(symbol: "timer", value: t.focusSessions == 0 ? "0" : "\(t.focusSessions) · \(t.focusMinutes)m",
+                         label: "Focus sessions", tint: .purple)
+                StatTile(symbol: "cup.and.saucer", value: "\(t.breaks)", label: "Breaks", tint: .orange)
+                StatTile(symbol: "heart", value: "\(t.pets + t.treats)", label: "Pets and treats", tint: .pink)
+                StatTile(symbol: "soccerball", value: "\(t.plays)", label: "Games played", tint: .green)
+            }
+            if let y = log.yesterday, !y.isEmpty {
+                Text(y.summary(prefix: "Yesterday"))
+                    .font(.callout)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(12)
+                    .background(RoundedRectangle(cornerRadius: 12).fill(Color.primary.opacity(0.04)))
+            }
+            Text("Only counts and durations are kept, on this Mac. Nothing about what you type or do.")
+                .font(.caption).foregroundStyle(.secondary)
+            Spacer(minLength: 0)
+        }
+        .padding(20)
     }
 }
 
@@ -227,7 +379,7 @@ struct GeneralTab: View {
 // MARK: Window
 
 struct SettingsView: View {
-    static let size = NSSize(width: 500, height: 390)
+    static let size = NSSize(width: 520, height: 420)
 
     @ObservedObject var settings: PetSettings
     var onSayHi: () -> Void
@@ -241,6 +393,10 @@ struct SettingsView: View {
                 .tabItem { Label("Pet", systemImage: "pawprint") }
             BehaviorTab(settings: settings)
                 .tabItem { Label("Behavior", systemImage: "figure.walk") }
+            RemindersTab(settings: settings)
+                .tabItem { Label("Reminders", systemImage: "bell") }
+            TodayTab(log: .shared)
+                .tabItem { Label("Today", systemImage: "chart.bar") }
             GeneralTab(settings: settings, onBringBack: onBringBack)
                 .tabItem { Label("General", systemImage: "gearshape") }
         }
