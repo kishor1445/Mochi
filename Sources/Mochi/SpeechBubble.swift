@@ -90,7 +90,8 @@ final class SpeechBubble {
         window.hasShadow = false
         window.level = NSWindow.Level(rawValue: NSWindow.Level.floating.rawValue + 1)
         window.ignoresMouseEvents = true
-        window.collectionBehavior = [.canJoinAllSpaces, .stationary, .fullScreenAuxiliary]
+        window.collectionBehavior = [.canJoinAllSpaces, .stationary, .fullScreenAuxiliary, .ignoresCycle]
+        window.animationBehavior = .none
         window.isReleasedWhenClosed = false
         window.contentView = view
     }

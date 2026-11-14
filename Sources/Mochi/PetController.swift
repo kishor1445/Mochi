@@ -45,6 +45,14 @@ final class PetController {
     private var platform = Platform(id: 0, minX: 0, maxX: 0, top: 0)
     private var windowPlatforms: [Platform] = []
     private var lastScan = Date.distantPast
+    private var freezeUntil = Date.distantPast      // ignore window changes while Spaces slide
+    private var lastFreeze = Date.distantPast
+    private var missingScans = 0
+
+    // Slipping off walls / ceiling
+    private var gripTime: TimeInterval = 0
+    private var slipTimer: CGFloat = 0
+    private var slipped = false
 
     // Behavior
     private var action: PetAction = .idle
@@ -65,9 +73,21 @@ final class PetController {
         window.backgroundColor = .clear
         window.hasShadow = false
         window.level = .floating
-        window.collectionBehavior = [.canJoinAllSpaces, .stationary, .fullScreenAuxiliary]
+        // Visible on every Space and over full-screen apps; stays put while Spaces slide.
+        window.collectionBehavior = [.canJoinAllSpaces, .stationary, .fullScreenAuxiliary, .ignoresCycle]
+        window.animationBehavior = .none
+        window.hidesOnDeactivate = false
         window.contentView = view
         window.isReleasedWhenClosed = false
+
+        // Swiping between Spaces shuffles every window's position: pause window tracking until it settles.
+        NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.activeSpaceDidChangeNotification, object: nil, queue: .main
+        ) { [weak self] _ in
+            guard let self else { return }
+            self.freezeUntil = Date().addingTimeInterval(1.2)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { self.window.orderFrontRegardless() }
+        }
 
         view.species = settings.species
         view.onClick = { [weak self] in self?.petted() }
@@ -202,15 +222,29 @@ final class PetController {
     private func refreshPlatforms(_ now: Date, _ f: NSRect) {
         guard now.timeIntervalSince(lastScan) > 0.25 else { return }
         lastScan = now
-        windowPlatforms = settings.walkOnWindows ? WindowScanner.platforms(in: f) : []
+        if now < freezeUntil { return }            // Spaces are sliding: keep what we knew
+
+        let scanned = settings.walkOnWindows ? WindowScanner.platforms(in: f) : []
 
         if surface == .floor, platform.id != 0, jump == nil {
-            if let p = windowPlatforms.first(where: { $0.id == platform.id }) {
-                platform = p                       // the window moved: follow it
+            if let p = scanned.first(where: { $0.id == platform.id }) {
+                missingScans = 0
+                let jumped = abs(p.top - platform.top) > 80 || abs(p.minX - platform.minX) > 80
+                if jumped, now.timeIntervalSince(lastFreeze) > 2 {
+                    // A sudden big move (Space swipe, window snapping): wait for it to settle.
+                    lastFreeze = now
+                    freezeUntil = now.addingTimeInterval(0.8)
+                    return
+                }
+                platform = p                       // follow the window
             } else {
-                surface = .air; vy = 0             // window closed / hidden: fall
+                missingScans += 1
+                if missingScans < 3 { return }     // may be a flicker: only fall if it stays gone
+                missingScans = 0
+                surface = .air; vy = 0             // window closed or on another Space
             }
         }
+        windowPlatforms = scanned
     }
 
     private func reachable(_ p: Platform, feet: CGFloat) -> Bool {
@@ -253,6 +287,23 @@ final class PetController {
         } else if surface != .floor && !settings.climbEdges {
             surface = .air; vy = 0                 // climbing turned off: let go
         } else {
+            if surface == .floor { gripTime = 0 }
+            else {
+                gripTime += TimeInterval(dt)
+                if slipTimer > 0 {
+                    // Losing grip: wobble, then fall.
+                    slipTimer -= dt
+                    view.mood = .held
+                    view.spin = sin(view.time * 38) * 0.14
+                    targetAngle = angle(for: surface)
+                    if slipTimer <= 0 { view.spin = 0; letGo() }
+                    finish(dt, f)
+                    return
+                }
+                // The longer it hangs on, the more likely it slips (ceiling is harder).
+                let rate = (surface == .ceiling ? 0.02 : 0.012) + min(0.06, gripTime * 0.002)
+                if Double.random(in: 0..<1) < rate * Double(dt) { startSlip() }
+            }
             remaining -= TimeInterval(dt)
             maybeGreet(now)
             if remaining <= 0 { apply(brain.nextDecision(context(f))) }
@@ -320,7 +371,10 @@ final class PetController {
         vy = 0
         cx = clamp(cx, p.minX, p.maxX)
         cy = p.top + Self.reach
-        if p.id != 0, Double.random(in: 0..<1) < 0.5 {
+        if slipped {
+            slipped = false
+            say(Dialogue.ouch.randomElement() ?? "Ow!", force: true)
+        } else if p.id != 0, Double.random(in: 0..<1) < 0.5 {
             say(Dialogue.landedWindow.randomElement() ?? "Nice!")
         }
         action = .idle
@@ -343,11 +397,28 @@ final class PetController {
         return true
     }
 
+    private func startSlip() {
+        slipTimer = 0.8
+        slipped = true
+        say(Dialogue.slipping.randomElement() ?? "Uh oh…", force: true)
+    }
+
+    private func letGo() {
+        if surface == .leftWall { cx += 10 } else if surface == .rightWall { cx -= 10 }
+        surface = .air
+        vy = 0
+        gripTime = 0
+    }
+
     // MARK: Dragging
 
     private func dragBegan() {
         held = true
         jump = nil
+        slipTimer = 0
+        slipped = false
+        gripTime = 0
+        view.spin = 0
         touch()
         if Double.random(in: 0..<1) < 0.35 { say(Dialogue.dragged.randomElement() ?? "Wheee!", force: true) }
     }

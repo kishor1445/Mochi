@@ -29,5 +29,7 @@ enum Dialogue {
     static let dragged = ["Wheee!", "Put me down! …or don't.", "Whoa whoa whoa!", "I believe I can fly!"]
     static let landedWindow = ["Nice view up here!", "King of this window 👑", "Found a cozy spot!"]
     static let clung = ["Got a grip!", "Spider-pet! 🕷", "Look, I'm climbing!"]
+    static let slipping = ["Uh oh…", "My grip!", "Hold on—", "I'm slipping!"]
+    static let ouch = ["Ow! I'm okay.", "Ta-da! …on purpose.", "That was my plan all along.", "Nailed the landing!"]
     static let leaping = ["Hup!", "Boing!", "Up we go!"]
 }
