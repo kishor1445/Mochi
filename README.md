@@ -38,6 +38,17 @@ Switch pets any time from the Pet tab in settings:
 - **Memory**: it remembers all of this between launches, rests while the app is closed, and misses you when you've been gone
 - See how it's doing at the top of the menu and in the settings panel
 
+**Plays with you (and with a friend)**
+- **Throw and bounce**: let go of the pet mid-swing and it flies, tumbles, bounces off the screen edges and lands dizzy
+- **Second pet**: turn on a companion in settings and the two run over to greet each other
+- **Hide and peek**: it sneaks to a screen edge, ducks behind it and pops out when your cursor comes looking
+- **Outfits**: a flower, glasses, a party hat, a crown and a halo unlock as your bond levels up
+
+**Looks after you**
+- **Gentle reminders**: water, posture and eye-rest nudges at intervals you choose, plus a stretch after 50 minutes of work. They count time you are actually at your Mac and wait for calls and focus sessions to end
+- **Daily check-in**: a Today tab with your day in numbers (time at the Mac, typing, focus sessions, breaks), and a recap at 6 pm and the next morning
+- **Calendar alerts** (optional): a heads-up five minutes before an event and as it starts. This is the only feature that asks for a permission
+
 **Moves around your whole screen**
 - Walks the Dock, **climbs the left and right edges**, crawls along the top, and comes back down
 - Sometimes decides on its own to head for an edge and climb; its grip is strong, but after a long time hanging around it may slip and fall
@@ -52,7 +63,8 @@ Switch pets any time from the Pet tab in settings:
 - **Anything else making sound** (browsers, etc.): bobs along and sometimes dances
 - **Typing**: bops along with every key you press and cheers when you're on a roll or typing fast. It only reads the system's running count of key presses, never which keys
 - Falls asleep when you step away, and welcomes you back when you return
-- Reminds you to stretch after about 50 minutes of work, comments on low battery, plugging in and mealtimes
+- **Busy Mac**: sweats when the processor is flat out or the Mac runs hot, and shivers when the battery is nearly empty
+- Comments on low battery, plugging in and mealtimes
 
 **Interacts with you**
 - Eyes follow your cursor; it sometimes chases it and looks at you when you are near
@@ -68,7 +80,9 @@ Switch pets any time from the Pet tab in settings:
 - **Launch at login** (when run from the built `Mochi.app`)
 - **Three sizes**: Small, Medium (default) and Large
 
-Lightweight: native Swift and AppKit, no dependencies, no Dock icon.
+Lightweight: native Swift and AppKit, no dependencies, no Dock icon. Easy on the battery too: nothing runs
+while the Mac sleeps, the display is off or the screen is locked, and the pet animates more slowly when it
+is napping or just standing around.
 
 ## Requirements
 
@@ -100,7 +114,7 @@ The build is ad-hoc signed, so on first launch macOS may ask you to right-click 
 | Click the pet | Pets it (hearts and a happy hop) |
 | Drag and drop | Pick it up; let go near an edge to make it cling |
 | Right-click the pet or click the menu bar icon | A status card, then Give a Treat, Play Ball, Interact (say hi, pet, come here, trick, sleep), Focus Session, Bring Back, Settings, Quit |
-| Settings | **Pet**: choose a pet and see how it's doing. **Behavior**: what it's allowed to do and react to. **General**: size, speech bubbles, launch at login |
+| Settings | **Pet**: choose a pet and see how it's doing. **Behavior**: what it's allowed to do and react to. **Reminders**: nudges, calendar alerts, daily check-in. **Today**: your day in numbers. **General**: size, speech bubbles, launch at login |
 | `⌘ ,` / `⌘ B` (menu open) | Open settings / bring the pet back |
 
 ## How it works
@@ -118,13 +132,16 @@ Sources/Mochi
 ├── PetController.swift    window, 30fps loop, surfaces, physics, reactions
 ├── Brain.swift            PetAction, Brain protocol, MindBrain (swap in AI here)
 ├── Mind.swift             the pet's needs, bond and memory (saved between launches)
+├── Outfit.swift           things to wear and the bond level that unlocks each
+├── DayStats.swift         today's and yesterday's numbers for the daily check-in
+├── CalendarWatcher.swift  upcoming events (only if you turn calendar alerts on)
 ├── PetView.swift          drawing for every pet and mood, mouse input
 ├── Species.swift          pet definitions (colours, speed, lines)
 ├── Dialogue.swift         everything the pet says
 ├── SpeechBubble.swift     the speech bubble window
 ├── Platform.swift         finds window tops to stand on
 ├── AudioWatcher.swift     notices which apps are playing sound (music / video / call)
-├── SystemInfo.swift       idle time, battery and the key press count
+├── SystemInfo.swift       idle time, battery, processor load and the key press count
 ├── Treat.swift            the snack and the ball you can drop for the pet
 ├── LoginItem.swift        launch at login
 ├── PetSettings.swift      saved preferences (UserDefaults)
@@ -158,7 +175,7 @@ then pass it to `PetController(brain:)`.
 
 - [ ] AI brain that chats and decides what to do
 - [ ] Real beat detection (needs audio-capture permission)
-- [ ] More pets and more tricks (hide and peek)
+- [ ] More pets and more tricks
 - [ ] Multi-monitor roaming
 
 ## Contributing

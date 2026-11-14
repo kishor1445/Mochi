@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.5.0
+
+- Throw and bounce: let go of the pet mid-swing and it flies, tumbles, bounces off the screen edges and lands dizzy
+- Second pet: switch on a companion in settings; the two run over to greet each other
+- Hide and peek: the pet sneaks to a screen edge, ducks behind it and pops out when you come looking
+- Outfits: flower, glasses, party hat, crown and halo unlock as your bond levels up
+- Daily check-in: a Today tab with your day in numbers, a recap at 6 pm and the next morning, and "Daily Check-in" in the menu
+- Gentle reminders: water, posture and eye-rest nudges at intervals you choose, alongside the stretch reminder
+- Busy-Mac reactions: the pet sweats when the processor is flat out or the Mac runs hot, and shivers on a nearly empty battery
+- Calendar alerts (optional, asks for permission): a heads-up five minutes before events and as they start
+- Battery: everything stops while the Mac sleeps, the display is off or the screen is locked; a napping pet animates at 6 fps and a standing one at 15; window scans are cached and shared; settings previews stop when the window is closed
+- `swift run` and the built app now share the same saved pet (older `swift run` data is carried over)
+- Settings gained Reminders and Today tabs
+
 ## 0.4.0
 
 - Pets have a brain now: energy, tummy and joy drift over time and steer what the pet does (naps when tired, sulks and asks for a snack when hungry, comes looking for you when lonely, extra bouncy when happy)
