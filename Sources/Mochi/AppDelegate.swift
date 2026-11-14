@@ -1,5 +1,6 @@
 import AppKit
 import Combine
+import SwiftUI
 
 final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var pet: PetController!
@@ -38,56 +39,59 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         return menu
     }
 
+    /// Layout: a small status card, the things you do most, two submenus, then app controls.
     func menuNeedsUpdate(_ menu: NSMenu) {
         let species = PetSettings.shared.species
         let name = species.name
-        let mind = PetMind.shared
-        func pct(_ v: Double) -> String { "\(Int((v * 100).rounded()))%" }
-
         menu.removeAllItems()
-        menu.addItem(info("\(name) is \(mind.feeling.label.lowercased()) \(mind.feeling.emoji)"))
-        menu.addItem(info("⚡️ \(pct(mind.energy))   \(species.treatEmoji) \(pct(mind.fullness))   💖 \(pct(mind.joy))"))
-        menu.addItem(info("\(mind.bondTitle) · level \(mind.level) · day \(mind.daysTogether)"))
+
+        let header = NSMenuItem()
+        let host = NSHostingView(rootView: MenuHeader(mind: .shared, species: species))
+        host.frame = NSRect(origin: .zero, size: host.fittingSize)
+        header.view = host
+        menu.addItem(header)
         menu.addItem(.separator())
-        menu.addItem(item("Say hi", #selector(sayHi)))
-        menu.addItem(item("Pet \(name)", #selector(petIt)))
-        menu.addItem(item("Come here", #selector(comeHere)))
-        menu.addItem(item("Give a treat \(species.treatEmoji)", #selector(giveTreat)))
-        menu.addItem(item("Play ball \(species.toyEmoji)", #selector(playBall)))
-        menu.addItem(item("Do a trick", #selector(trick)))
-        menu.addItem(item("Go to sleep", #selector(sleepNow)))
-        menu.addItem(.separator())
+
+        menu.addItem(item("Give a Treat", "gift", #selector(giveTreat)))
+        menu.addItem(item("Play Ball", "soccerball", #selector(playBall)))
+        menu.addItem(submenu("Interact", "hand.wave", [
+            item("Say Hi", "bubble.left", #selector(sayHi)),
+            item("Pet \(name)", "heart", #selector(petIt)),
+            item("Come Here", "cursorarrow.rays", #selector(comeHere)),
+            item("Do a Trick", "sparkles", #selector(trick)),
+            item("Go to Sleep", "moon.zzz", #selector(sleepNow))
+        ]))
         if let left = pet.focusMinutesLeft {
-            menu.addItem(item("Stop focus session (\(left) min left)", #selector(stopFocus)))
+            menu.addItem(item("Stop Focus (\(left) min left)", "timer", #selector(stopFocus)))
         } else {
-            let focus = NSMenuItem(title: "Focus session", action: nil, keyEquivalent: "")
-            let sub = NSMenu()
-            sub.autoenablesItems = false
-            for minutes in [15, 25, 50] {
-                let i = item("\(minutes) minutes", #selector(startFocus(_:)))
+            menu.addItem(submenu("Focus Session", "timer", [15, 25, 50].map { minutes in
+                let i = item("\(minutes) Minutes", nil, #selector(startFocus(_:)))
                 i.tag = minutes
-                sub.addItem(i)
-            }
-            focus.submenu = sub
-            menu.addItem(focus)
+                return i
+            }))
         }
         menu.addItem(.separator())
-        menu.addItem(item("Bring \(name) back to screen", #selector(bringBack), key: "b"))
-        menu.addItem(item("Choose pet & settings…", #selector(openSettings), key: ","))
+        menu.addItem(item("Bring \(name) Back", "arrow.uturn.backward", #selector(bringBack), key: "b"))
+        menu.addItem(item("Settings…", "gearshape", #selector(openSettings), key: ","))
         menu.addItem(.separator())
-        menu.addItem(item("Quit", #selector(quit), key: "q"))
+        menu.addItem(item("Quit Mochi", nil, #selector(quit), key: "q"))
     }
 
-    private func info(_ title: String) -> NSMenuItem {
-        let i = NSMenuItem(title: title, action: nil, keyEquivalent: "")
-        i.isEnabled = false
-        return i
-    }
-
-    private func item(_ title: String, _ sel: Selector, key: String = "") -> NSMenuItem {
+    private func item(_ title: String, _ symbol: String?, _ sel: Selector, key: String = "") -> NSMenuItem {
         let i = NSMenuItem(title: title, action: sel, keyEquivalent: key)
         i.target = self
+        if let symbol { i.image = NSImage(systemSymbolName: symbol, accessibilityDescription: nil) }
         return i
+    }
+
+    private func submenu(_ title: String, _ symbol: String, _ items: [NSMenuItem]) -> NSMenuItem {
+        let parent = NSMenuItem(title: title, action: nil, keyEquivalent: "")
+        parent.image = NSImage(systemSymbolName: symbol, accessibilityDescription: nil)
+        let sub = NSMenu()
+        sub.autoenablesItems = false
+        items.forEach(sub.addItem)
+        parent.submenu = sub
+        return parent
     }
 
     @objc private func sayHi() { pet.greet() }

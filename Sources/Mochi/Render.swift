@@ -49,8 +49,20 @@ enum Render {
 import SwiftUI
 
 extension Render {
+    /// Writes each settings tab and the menu header next to `path` (…-behavior.png, …-general.png, …-menu.png).
     static func settings(to path: String) {
-        let host = NSHostingView(rootView: SettingsView(settings: .shared, onSayHi: {}, onBringBack: {}, onTreat: {}, onPlay: {}))
+        let s = PetSettings.shared
+        let size = SettingsView.size
+        snapshot(PetTab(settings: s, onSayHi: {}, onTreat: {}, onPlay: {}).frame(width: size.width, height: size.height), to: path)
+        snapshot(BehaviorTab(settings: s).frame(width: size.width, height: size.height),
+                 to: path.replacingOccurrences(of: ".png", with: "-behavior.png"))
+        snapshot(GeneralTab(settings: s, onBringBack: {}).frame(width: size.width, height: size.height),
+                 to: path.replacingOccurrences(of: ".png", with: "-general.png"))
+        snapshot(MenuHeader(mind: .shared, species: s.species), to: path.replacingOccurrences(of: ".png", with: "-menu.png"))
+    }
+
+    private static func snapshot<V: View>(_ view: V, to path: String) {
+        let host = NSHostingView(rootView: view.background(Color(nsColor: .windowBackgroundColor)))
         host.appearance = NSAppearance(named: .aqua)
         host.frame = NSRect(origin: .zero, size: host.fittingSize)
         let win = NSWindow(contentRect: host.frame, styleMask: [.titled], backing: .buffered, defer: false)

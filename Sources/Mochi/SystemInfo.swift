@@ -9,6 +9,12 @@ enum SystemInfo {
         return CGEventSource.secondsSinceLastEventType(.combinedSessionState, eventType: any)
     }
 
+    /// How many keys have been pressed since login. This is only a running total from the system:
+    /// it says nothing about which keys, and needs no permission.
+    static func keyPressCount() -> UInt32 {
+        CGEventSource.counterForEventType(.combinedSessionState, eventType: .keyDown)
+    }
+
     /// Internal battery level and whether it's charging (nil on Macs without a battery).
     static func battery() -> (level: Int, charging: Bool)? {
         guard let info = IOPSCopyPowerSourcesInfo()?.takeRetainedValue(),

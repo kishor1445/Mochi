@@ -21,8 +21,10 @@ private struct Jump {
 /// Position is tracked as the window's centre (cx, cy). The pet's feet touch its surface
 /// `reach` points from the centre, which is why every surface snaps to `edge + reach`.
 final class PetController {
-    private static let half: CGFloat = PetView.side / 2     // 60
-    private static let reach: CGFloat = 52                  // centre → surface
+    /// How big the pet is on screen, relative to its 120pt design size.
+    private var scale: CGFloat { settings.petSize.scale }
+    private var half: CGFloat { PetView.side / 2 * scale }
+    private var reach: CGFloat { 52 * scale }               // centre → surface
 
     private let settings = PetSettings.shared
     private let mind = PetMind.shared
@@ -52,6 +54,7 @@ final class PetController {
     private var freezeUntil = Date.distantPast      // ignore window changes while Spaces slide
     private var lastFreeze = Date.distantPast
     private var missingScans = 0
+    private var dockHidden = false                  // space is reserved for the Dock but it isn't drawn
 
     // Slipping off walls / ceiling
     private var gripTime: TimeInterval = 0
@@ -84,6 +87,15 @@ final class PetController {
     private var hoverTime: CGFloat = 0
     private var hoverReacted = false
 
+    // Typing along (only ever a count of key presses, never which keys)
+    private var keyCount = SystemInfo.keyPressCount()
+    private var lastKey = Date.distantPast
+    private var typingRate: Double = 0              // keys per second, smoothed
+    private var typingStreak: TimeInterval = 0      // how long you've been typing without a real pause
+    private var fastTyping: TimeInterval = 0
+    private var nextTypingCheer: TimeInterval = 60
+    private var fastCheerAfter = Date.distantPast
+
     private var treat: Treat?
     private var ball: Ball?
     private var lastKickLine = Date.distantPast
@@ -96,7 +108,8 @@ final class PetController {
     init(brain: Brain = MindBrain()) {
         self.brain = brain
 
-        window = PetWindow(contentRect: NSRect(origin: .zero, size: PetView.size),
+        let side = PetView.side * PetSettings.shared.petSize.scale
+        window = PetWindow(contentRect: NSRect(x: 0, y: 0, width: side, height: side),
                            styleMask: .borderless, backing: .buffered, defer: false)
         window.isOpaque = false
         window.backgroundColor = .clear
@@ -118,22 +131,34 @@ final class PetController {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { self.window.orderFrontRegardless() }
         }
 
+        BubbleView.scale = settings.petSize.bubbleScale
         view.species = settings.species
         view.onClick = { [weak self] in self?.petted() }
         view.onDragBegan = { [weak self] in self?.dragBegan() }
         view.onDragEnded = { [weak self] in self?.dragEnded() }
 
+        checkDock()
         let f = screenFrame
         platform = dock(f)
         cx = f.midX
-        cy = platform.top + Self.reach
-        window.setFrameOrigin(NSPoint(x: cx - Self.half, y: cy - Self.half))
+        cy = platform.top + reach
+        window.setFrameOrigin(NSPoint(x: cx - half, y: cy - half))
 
         settings.$species.dropFirst().receive(on: DispatchQueue.main).sink { [weak self] s in
             guard let self else { return }
             self.view.species = s
             self.view.spawnHearts(4)
             self.say("Hi! I'm \(s.name)!", force: true)
+        }.store(in: &cancellables)
+
+        settings.$petSize.dropFirst().receive(on: DispatchQueue.main).sink { [weak self] size in
+            guard let self else { return }
+            let side = PetView.side * size.scale
+            BubbleView.scale = size.bubbleScale
+            self.bubble.rescale()
+            self.window.setContentSize(NSSize(width: side, height: side))
+            if self.surface == .floor { self.cy = self.platform.top + self.reach }
+            self.window.setFrameOrigin(NSPoint(x: self.cx - self.half, y: self.cy - self.half))
         }.store(in: &cancellables)
 
         settings.$chattiness.dropFirst().receive(on: DispatchQueue.main).sink { [weak self] _ in
@@ -297,19 +322,33 @@ final class PetController {
         view.angle = 0
         targetAngle = 0
         view.spin = 0
-        window.setFrameOrigin(NSPoint(x: cx - Self.half, y: cy - Self.half))
+        window.setFrameOrigin(NSPoint(x: cx - half, y: cy - half))
         window.orderFrontRegardless()
         say("Phew, I'm back!", force: true)
     }
 
     // MARK: Geometry
 
-    private var screenFrame: NSRect { (window.screen ?? NSScreen.main ?? NSScreen.screens[0]).visibleFrame }
+    /// The area the pet lives in: the screen minus the menu bar and the Dock.
+    /// When the Dock's strip is reserved but the Dock isn't there, the pet gets that strip too.
+    private var screenFrame: NSRect {
+        let s = window.screen ?? NSScreen.main ?? NSScreen.screens[0]
+        let v = s.visibleFrame
+        guard dockHidden else { return v }
+        return NSRect(x: s.frame.minX, y: s.frame.minY, width: s.frame.width, height: v.maxY - s.frame.minY)
+    }
+
+    private func checkDock() {
+        let s = window.screen ?? NSScreen.main ?? NSScreen.screens[0]
+        let v = s.visibleFrame
+        let reserved = v.minY - s.frame.minY > 8 || v.minX - s.frame.minX > 8 || s.frame.maxX - v.maxX > 8
+        dockHidden = reserved && !WindowScanner.dockIsShowing()
+    }
     private var hour: Int { Calendar.current.component(.hour, from: Date()) }
     private var canAct: Bool { surface != .air && jump == nil && !held }
 
     private func dock(_ f: NSRect) -> Platform {
-        Platform(id: 0, minX: f.minX + 52, maxX: f.maxX - 52, top: f.minY)
+        Platform(id: 0, minX: f.minX + reach, maxX: f.maxX - reach, top: f.minY)
     }
 
     private func allPlatforms(_ f: NSRect) -> [Platform] {
@@ -335,20 +374,20 @@ final class PetController {
 
     /// Pin the pet to its surface and keep it inside the screen.
     private func snap(_ f: NSRect) {
-        let r = Self.reach
+        let r = reach
         switch surface {
         case .floor:
             cx = clamp(cx, platform.minX, platform.maxX)
             cy = platform.top + r
         case .ceiling:
-            cx = clamp(cx, f.minX + 52, f.maxX - 52)
+            cx = clamp(cx, f.minX + reach, f.maxX - reach)
             cy = f.maxY - r
         case .leftWall:
             cx = f.minX + r
-            cy = clamp(cy, f.minY + 52, f.maxY - 52)
+            cy = clamp(cy, f.minY + reach, f.maxY - reach)
         case .rightWall:
             cx = f.maxX - r
-            cy = clamp(cy, f.minY + 52, f.maxY - 52)
+            cy = clamp(cy, f.minY + reach, f.maxY - reach)
         case .air:
             break
         }
@@ -365,6 +404,7 @@ final class PetController {
         guard now.timeIntervalSince(lastScan) > 0.25 else { return }
         lastScan = now
         if now < freezeUntil { return }            // Spaces are sliding: keep what we knew
+        checkDock()
 
         let scanned = settings.walkOnWindows ? WindowScanner.platforms(in: f) : []
 
@@ -399,10 +439,16 @@ final class PetController {
 
     private func tick(_ dt: CGFloat) {
         let now = Date()
-        let f = screenFrame
+        var f = screenFrame
         view.advance(dt)
-        if platform.id == 0 { platform = dock(f) }
         refreshPlatforms(now, f)
+        f = screenFrame                            // the Dock may have just appeared or gone
+        if platform.id == 0 {
+            let floor = dock(f)
+            // The floor dropped away (the Dock was hidden): fall to the new one instead of teleporting.
+            if surface == .floor, jump == nil, !held, floor.top < platform.top - 10 { surface = .air; vy = 0 }
+            platform = floor
+        }
         slowTick(now)
 
         if let t = treat {
@@ -418,6 +464,7 @@ final class PetController {
         if !held, !isOnScreen() { bringBack() }
 
         trackCursor(dt, now)
+        trackTyping(dt, now)
 
         if held {
             cx = window.frame.midX
@@ -488,7 +535,7 @@ final class PetController {
 
         // Eyes follow the cursor (converted into the pet's rotated frame).
         let m = NSEvent.mouseLocation
-        let vx = m.x - cx, vyy = m.y - (cy - 20)
+        let vx = m.x - cx, vyy = m.y - (cy - 20 * scale)
         let dist = hypot(vx, vyy)
         let ux = dist > 1 ? vx / dist : 0, uy = dist > 1 ? vyy / dist : 0
         let a = view.angle
@@ -497,18 +544,19 @@ final class PetController {
                             y: (-ux * sin(a) + uy * cos(a)) * strength)
         view.facing = facing
 
-        window.setFrameOrigin(NSPoint(x: cx - Self.half, y: cy - Self.half))
+        window.setFrameOrigin(NSPoint(x: cx - half, y: cy - half))
         view.needsDisplay = true
 
         if bubble.visible {
-            let head = settings.species.headRoom
+            let k = scale
+            let head = settings.species.headRoom * k
             switch surface {
             case .ceiling:
-                bubble.update(centerX: cx, aboveY: cy + 46, belowY: cy - 4 - head - 2, preferBelow: true, limit: f)
+                bubble.update(centerX: cx, aboveY: cy + 46 * k, belowY: cy - 4 * k - head - 2, preferBelow: true, limit: f)
             case .leftWall, .rightWall:
-                bubble.update(centerX: cx, aboveY: cy + 46, belowY: cy - 46, preferBelow: false, limit: f)
+                bubble.update(centerX: cx, aboveY: cy + 46 * k, belowY: cy - 46 * k, preferBelow: false, limit: f)
             default:
-                bubble.update(centerX: cx, aboveY: cy + 4 + head + 2, belowY: cy - 60, preferBelow: false, limit: f)
+                bubble.update(centerX: cx, aboveY: cy + 4 * k + head + 2, belowY: cy - 60 * k, preferBelow: false, limit: f)
             }
         }
     }
@@ -627,7 +675,7 @@ final class PetController {
         }
         shake = max(0, shake - dt * 1.5)
 
-        let dist = hypot(m.x - cx, m.y - (cy - 20))
+        let dist = hypot(m.x - cx, m.y - (cy - 20 * scale))
         let calm = canAct && !userAway
         if shake >= 5, dist < 350, calm, now > dizzyCooldown {
             shake = 0
@@ -637,7 +685,7 @@ final class PetController {
         }
 
         // Hovering the cursor over the pet without clicking gets a happy reaction.
-        if calm, dist < 48, action != .sleep, action != .dizzy {
+        if calm, dist < 48 * scale, action != .sleep, action != .dizzy {
             hoverTime += dt
             if hoverTime > 1.2, !hoverReacted {
                 hoverReacted = true
@@ -646,9 +694,48 @@ final class PetController {
                 action = .happy
                 remaining = 1.2
             }
-        } else if dist > 60 {
+        } else if dist > 60 * scale {
             hoverTime = 0
             hoverReacted = false
+        }
+    }
+
+    // MARK: Typing along
+
+    private func trackTyping(_ dt: CGFloat, _ now: Date) {
+        let count = SystemInfo.keyPressCount()
+        let keys = count >= keyCount ? Double(count - keyCount) : 0
+        keyCount = count
+        guard settings.reactToTyping else {
+            typingRate = 0; typingStreak = 0; fastTyping = 0
+            return
+        }
+        let t = Double(dt)
+        typingRate += (keys / t - typingRate) * min(1, t * 1.5)
+        if keys > 0 {
+            lastKey = now
+            view.tap = 1                           // bop along with each key
+        }
+
+        // A streak survives short thinking pauses and ends after a real break.
+        let pause = now.timeIntervalSince(lastKey)
+        if pause < 2.5 { typingStreak += t }
+        else if pause > 8 { typingStreak = 0; nextTypingCheer = 60 }
+        fastTyping = typingRate > 7 ? fastTyping + t : max(0, fastTyping - t)
+
+        guard canAct, !userAway, action != .sleep, treat == nil, ball == nil else { return }
+        if fastTyping > 4, now > fastCheerAfter {
+            fastTyping = 0
+            fastCheerAfter = now.addingTimeInterval(180)
+            say(Dialogue.typingFast.randomElement() ?? "Speedy!")
+            action = .happy
+            remaining = 1.4
+        } else if typingStreak >= nextTypingCheer {
+            // Cheer at one minute, at five, then every ten.
+            let long = nextTypingCheer >= 300
+            nextTypingCheer = nextTypingCheer < 300 ? 300 : nextTypingCheer + 600
+            view.spawnHearts(2)
+            say((long ? Dialogue.typingLong : Dialogue.typingRoll).randomElement() ?? "Nice!")
         }
     }
 
@@ -747,11 +834,11 @@ final class PetController {
     // MARK: Falling & landing
 
     private func fall(_ dt: CGFloat, _ f: NSRect) {
-        let prevFeet = cy - Self.reach
+        let prevFeet = cy - reach
         vy -= 1800 * dt
         cy += vy * dt
-        let newFeet = cy - Self.reach
-        cx = clamp(cx, f.minX + 52, f.maxX - 52)
+        let newFeet = cy - reach
+        cx = clamp(cx, f.minX + reach, f.maxX - reach)
         view.mood = .held
         targetAngle = 0
 
@@ -767,7 +854,7 @@ final class PetController {
         surface = .floor
         vy = 0
         cx = clamp(cx, p.minX, p.maxX)
-        cy = p.top + Self.reach
+        cy = p.top + reach
         if slipped {
             slipped = false
             say(Dialogue.ouch.randomElement() ?? "Ow!", force: true)
@@ -780,9 +867,9 @@ final class PetController {
     }
 
     private func startLeap() -> Bool {
-        let feet = cy - Self.reach
+        let feet = cy - reach
         guard let p = windowPlatforms.filter({ reachable($0, feet: feet) }).randomElement() else { return false }
-        let end = CGPoint(x: clamp(cx, p.minX, p.maxX), y: p.top + Self.reach)
+        let end = CGPoint(x: clamp(cx, p.minX, p.maxX), y: p.top + reach)
         let start = CGPoint(x: cx, y: cy)
         let dist = hypot(end.x - start.x, end.y - start.y)
         facing = end.x >= start.x ? 1 : -1
@@ -841,8 +928,8 @@ final class PetController {
             say(Dialogue.clung.randomElement() ?? "Got a grip!")
         } else {
             // Never let go outside the screen: pull it back inside before it falls.
-            cx = clamp(cx, f.minX + 52, f.maxX - 52)
-            cy = min(cy, f.maxY - 52)
+            cx = clamp(cx, f.minX + reach, f.maxX - reach)
+            cy = min(cy, f.maxY - reach)
             surface = .air
         }
     }
@@ -1002,8 +1089,8 @@ final class PetController {
             else if cx >= platform.maxX && s > 0 { floorEnd(f, left: false, s) }
 
         case .ceiling:
-            let left = cx <= f.minX + 52 && s < 0
-            let right = cx >= f.maxX - 52 && s > 0
+            let left = cx <= f.minX + reach && s < 0
+            let right = cx >= f.maxX - reach && s > 0
             if left || right {
                 if Double.random(in: 0..<1) < 0.7 {
                     surface = left ? .leftWall : .rightWall
@@ -1013,13 +1100,13 @@ final class PetController {
             }
 
         case .leftWall, .rightWall:
-            if cy >= f.maxY - 52 && s > 0 {
+            if cy >= f.maxY - reach && s > 0 {
                 if Double.random(in: 0..<1) < 0.7 {
                     surface = .ceiling
                     facing = map(was == .leftWall ? 1 : -1, .ceiling)
                     snap(f)
                 } else { turnAround() }
-            } else if cy <= f.minY + 52 && s < 0 {
+            } else if cy <= f.minY + reach && s < 0 {
                 surface = .floor
                 platform = dock(f)
                 facing = map(was == .leftWall ? 1 : -1, .floor)
@@ -1055,12 +1142,12 @@ final class PetController {
         let frac: CGFloat
         switch surface {
         case .floor: frac = (cx - platform.minX) / max(1, platform.maxX - platform.minX)
-        case .ceiling: frac = (cx - (f.minX + 52)) / max(1, f.width - 104)
-        case .leftWall, .rightWall: frac = (cy - (f.minY + 52)) / max(1, f.height - 104)
+        case .ceiling: frac = (cx - (f.minX + reach)) / max(1, f.width - 2 * reach)
+        case .leftWall, .rightWall: frac = (cy - (f.minY + reach)) / max(1, f.height - 2 * reach)
         case .air: frac = 0.5
         }
         let m = NSEvent.mouseLocation
-        let feet = cy - Self.reach
+        let feet = cy - reach
         return PetContext(surface: surface,
                           axisFraction: frac,
                           cursorDistance: hypot(m.x - cx, m.y - cy),

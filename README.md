@@ -25,7 +25,7 @@ and runs offline, but the pet's decisions go through a single `Brain` interface,
 | **Pip** 🐧 | Waddly, dapper penguin with a feather tuft and a red scarf who flaps when happy. Always hungry |
 | **Boo** 👻 | Floaty, friendly ghost with a wavy hem. Barely sleeps or eats |
 
-Switch pets any time from the settings panel:
+Switch pets any time from the Pet tab in settings:
 
 ![Settings panel](docs/settings.png)
 
@@ -65,6 +65,7 @@ Switch pets any time from the settings panel:
 - Speech bubbles: random hellos, time-of-day greetings and pet-specific lines (Silent / Quiet / Normal / Chatty)
 - **Bring back to screen** button in case it ever wanders off
 - **Launch at login** (when run from the built `Mochi.app`)
+- **Three sizes**: Small, Medium (default) and Large
 
 Lightweight: native Swift and AppKit, no dependencies, no Dock icon.
 
@@ -97,7 +98,8 @@ The build is ad-hoc signed, so on first launch macOS may ask you to right-click 
 | --- | --- |
 | Click the pet | Pets it (hearts and a happy hop) |
 | Drag and drop | Pick it up; let go near an edge to make it cling |
-| Right-click the pet or click the menu bar icon | How it's feeling, say hi, pet, come here, give a treat, play ball, do a trick, sleep, focus session, bring back, settings, quit |
+| Right-click the pet or click the menu bar icon | A status card, then Give a Treat, Play Ball, Interact (say hi, pet, come here, trick, sleep), Focus Session, Bring Back, Settings, Quit |
+| Settings | **Pet**: choose a pet and see how it's doing. **Behavior**: what it's allowed to do and react to. **General**: size, speech bubbles, launch at login |
 | `⌘ ,` / `⌘ B` (menu open) | Open settings / bring the pet back |
 
 ## How it works

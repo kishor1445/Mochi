@@ -11,6 +11,23 @@ struct Platform {
 /// Finds visible windows so the pet can stand on them. Needs no special permission
 /// (it only reads window frames, not their contents).
 enum WindowScanner {
+    /// Whether the Dock is actually drawn on screen right now. `NSScreen.visibleFrame` keeps reserving
+    /// the Dock's strip even when something hides the Dock (a hider utility, some full-size windows),
+    /// which would leave the pet standing on thin air.
+    static func dockIsShowing() -> Bool {
+        guard let list = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements],
+                                                    kCGNullWindowID) as? [[String: Any]] else { return true }
+        let dockLevel = Int(CGWindowLevelForKey(.dockWindow))
+        return list.contains { w in
+            guard (w[kCGWindowOwnerName as String] as? String) == "Dock",
+                  (w[kCGWindowLayer as String] as? Int) == dockLevel,
+                  ((w[kCGWindowAlpha as String] as? NSNumber)?.doubleValue ?? 1) > 0.05,
+                  let bounds = w[kCGWindowBounds as String] as? NSDictionary,
+                  let rect = CGRect(dictionaryRepresentation: bounds as CFDictionary) else { return false }
+            return rect.width > 20 && rect.height > 20
+        }
+    }
+
     static func platforms(in f: NSRect) -> [Platform] {
         guard let list = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements],
                                                     kCGNullWindowID) as? [[String: Any]] else { return [] }

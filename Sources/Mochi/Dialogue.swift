@@ -62,6 +62,11 @@ enum Dialogue {
     static let playedEnough = ["That was fun! 💖", "Again sometime?", "Phew, good game!"]
     static let tooTired = ["Too tired to play… 😴", "Later? I need a nap first."]
 
+    // Typing along
+    static let typingRoll = ["You're on a roll! ✨", "Look at you go!", "Tap tap tap… I like the rhythm 🎶"]
+    static let typingLong = ["So productive today! 💪", "Still going! You're unstoppable.", "That's a lot of typing. Proud of you 💖"]
+    static let typingFast = ["Whoa, fast fingers! ⌨️", "Speedy!! 💨", "Are your keys okay?! 🔥"]
+
     // Focus sessions
     static let focusStart = ["Focus time! I'll keep quiet 🤫", "You've got this! I'll be right here.", "Let's do this! 💪"]
     static let focusDone = ["Focus done! Great work 🎉 Time for a break.", "You did it! 🎉 Stretch a little?", "All done! Proud of you 💖"]

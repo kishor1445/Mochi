@@ -11,8 +11,10 @@ struct Heart {
 
 /// Draws the pet with Core Graphics (no image assets) and forwards mouse input.
 final class PetView: NSView {
+    /// The pet is drawn on a 120pt design canvas and scaled to whatever size the view is.
     static let side: CGFloat = 120
     static let size = NSSize(width: side, height: side)
+    private static let canvas = NSRect(origin: .zero, size: size)
 
     var species: Species = .mochi
     var mood: Mood = .idle
@@ -22,6 +24,7 @@ final class PetView: NSView {
     var spin: CGFloat = 0                // extra twirl / wobble around the pet's own centre
     var gaze: CGPoint = .zero            // where the eyes look (local coordinates)
     var musicBpm: CGFloat = 0            // > 0 while music plays: headphones + bobbing to the beat
+    var tap: CGFloat = 0                 // 1 right after a key press, fades fast: a little bop while you type
     var isPreview = false                // settings-panel mini version
 
     var onClick: (() -> Void)?
@@ -40,6 +43,7 @@ final class PetView: NSView {
 
     func advance(_ dt: CGFloat) {
         time += dt
+        tap = max(0, tap - dt * 7)
         for i in hearts.indices {
             hearts[i].age += dt
             if hearts[i].age > 0 { hearts[i].y += 36 * dt }
@@ -49,7 +53,7 @@ final class PetView: NSView {
 
     func spawnHearts(_ n: Int) {
         for i in 0..<n {
-            hearts.append(Heart(x: bounds.midX + .random(in: -24...24), y: 70 + .random(in: 0...10),
+            hearts.append(Heart(x: Self.canvas.midX + .random(in: -24...24), y: 70 + .random(in: 0...10),
                                 size: .random(in: 5...8), age: -CGFloat(i) * 0.15))
         }
     }
@@ -95,25 +99,28 @@ final class PetView: NSView {
     override func draw(_ dirtyRect: NSRect) {
         guard let ctx = NSGraphicsContext.current?.cgContext else { return }
         ctx.saveGState()
-        ctx.translateBy(x: bounds.midX, y: bounds.midY)
+        ctx.scaleBy(x: bounds.width / Self.side, y: bounds.height / Self.side)
+        ctx.saveGState()
+        ctx.translateBy(x: Self.canvas.midX, y: Self.canvas.midY)
         ctx.rotate(by: angle)
-        ctx.translateBy(x: -bounds.midX, y: -bounds.midY)
+        ctx.translateBy(x: -Self.canvas.midX, y: -Self.canvas.midY)
         if spin != 0 {
-            ctx.translateBy(x: bounds.midX, y: 36)
+            ctx.translateBy(x: Self.canvas.midX, y: 36)
             ctx.rotate(by: spin)
-            ctx.translateBy(x: -bounds.midX, y: -36)
+            ctx.translateBy(x: -Self.canvas.midX, y: -36)
         }
         var sway: CGFloat = 0
         if mood == .dance { sway = sin(time * 8) * 0.14 }
         else if species == .penguin && (mood == .walk || mood == .chase) { sway = sin(time * 10) * 0.12 }
         if sway != 0 {
-            ctx.translateBy(x: bounds.midX, y: 8)
+            ctx.translateBy(x: Self.canvas.midX, y: 8)
             ctx.rotate(by: sway)
-            ctx.translateBy(x: -bounds.midX, y: -8)
+            ctx.translateBy(x: -Self.canvas.midX, y: -8)
         }
         drawPet(ctx)
         ctx.restoreGState()
         drawHearts()
+        ctx.restoreGState()
     }
 
     private func drawPet(_ ctx: CGContext) {
@@ -141,6 +148,11 @@ final class PetView: NSView {
             lift += beat * 4
             squash -= beat * 0.04
         }
+        // A quick bop for every key you press.
+        if tap > 0, mood == .idle || mood == .walk || mood == .sad {
+            lift += tap * 3.5
+            squash -= tap * 0.045
+        }
         // Ghosts float.
         let hover: CGFloat = sp == .ghost ? (mood == .sleep ? 1 : 7 + sin(t * 3) * 2.5) : 0
 
@@ -154,12 +166,12 @@ final class PetView: NSView {
         }
         let h = baseH * squash
         let w = baseW * (2 - squash)
-        let body = NSRect(x: bounds.midX - w / 2, y: 8 + lift + hover, width: w, height: h)
+        let body = NSRect(x: Self.canvas.midX - w / 2, y: 8 + lift + hover, width: w, height: h)
 
         // Shadow
         let ss = max(0.35, 1 - (lift + hover) / 60)
         NSColor.black.withAlphaComponent(0.16).setFill()
-        NSBezierPath(ovalIn: NSRect(x: bounds.midX - 31 * ss, y: 4, width: 62 * ss, height: 8)).fill()
+        NSBezierPath(ovalIn: NSRect(x: Self.canvas.midX - 31 * ss, y: 4, width: 62 * ss, height: 8)).fill()
 
         // Behind the body
         switch sp {

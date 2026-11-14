@@ -1,7 +1,27 @@
+# Swift Package Manager build output
 .build/
 .swiftpm/
-.DS_Store
+
+# Built app bundle (scripts/build-app.sh)
 dist/
+
+# Xcode
 *.xcodeproj
+*.xcworkspace
 xcuserdata/
-preview.png
+DerivedData/
+*.dSYM/
+
+# Preview sheets from `Mochi --render preview.png` (writes preview-*.png alongside)
+preview*.png
+
+# macOS and editors
+.DS_Store
+.vscode/
+.idea/
+*.swp
+
+# Local tooling settings and secrets
+.claude/
+.env
+.env.*
