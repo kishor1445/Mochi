@@ -134,6 +134,7 @@ final class PetController {
     private var treat: Treat?
     private var ball: Ball?
     private var lastKickLine = Date.distantPast
+    private var flipLength: TimeInterval = 0.8
 
     /// When the running focus session ends (nil = no session).
     private(set) var focusEnds: Date?
@@ -435,6 +436,12 @@ final class PetController {
         if canAct { apply(Decision(action: .dance, duration: 5)) }
     }
 
+    /// The pet's signature move: fire for the dragon, lightning for the robot, a roar for the dino…
+    func powerMove() {
+        touch()
+        if canAct { apply(Decision(action: .power, duration: 2.2), forceSay: true) }
+    }
+
     /// A random trick, on demand (menu bar / right-click).
     func trick() {
         touch()
@@ -443,7 +450,9 @@ final class PetController {
             Decision(action: .spin, duration: 0.9),
             Decision(action: .stretch, duration: 2.4),
             Decision(action: .zoomies, duration: 3.5),
-            Decision(action: .lookAround, duration: 3)
+            Decision(action: .lookAround, duration: 3),
+            Decision(action: .flip, duration: 0.8),
+            Decision(action: .power, duration: 2.2)
         ]
         if canAct, let d = options.randomElement() { apply(d) }
     }
@@ -1022,12 +1031,17 @@ final class PetController {
             cx += (b.x >= cx ? 1 : -1) * 30
             return true
         }
-        if b.kicks >= 6 || now.timeIntervalSince(b.born) > 30 {
+        if b.kicks >= 25 || now.timeIntervalSince(b.born) > 50 {
             endBall(celebrate: true)
             return true
         }
         let dx = b.x - cx
         if abs(dx) < 32, b.canKick {
+            // The longer the rally, the likelier a miss: that ends the game and sets the score.
+            if b.kicks >= 3, Double.random(in: 0..<1) < min(0.45, 0.07 * Double(b.kicks - 2)) {
+                endBall(celebrate: true)
+                return true
+            }
             // Kick it away, but back towards the middle when it is near a screen edge.
             var dir: CGFloat = dx >= 0 ? 1 : -1
             if b.x < f.minX + 220 { dir = 1 } else if b.x > f.maxX - 220 { dir = -1 }
@@ -1058,7 +1072,12 @@ final class PetController {
         mind.played()
         log.played()
         view.spawnHearts(4)
-        say(Dialogue.playedEnough.randomElement() ?? "That was fun!", force: true)
+        // Score the rally and remember the best one.
+        let best = UserDefaults.standard.integer(forKey: "bestRally")
+        let record = b.kicks > best && b.kicks >= 3
+        if record { UserDefaults.standard.set(b.kicks, forKey: "bestRally") }
+        say(b.kicks == 0 ? (Dialogue.playedEnough.randomElement() ?? "That was fun!")
+                         : Dialogue.rally(b.kicks, record: record), force: true, seconds: 4.5)
         action = .happy
         remaining = 2.2
     }
@@ -1251,6 +1270,12 @@ final class PetController {
                 action = .idle
                 remaining = 1.5
             }
+        case .power:
+            if forceSay || Double.random(in: 0..<1) < 0.6 {
+                say(Dialogue.power(species).randomElement() ?? "Ta-daa!", force: forceSay)
+            }
+        case .flip:
+            flipLength = max(0.3, d.duration)
         case .greet:
             say(greetingLine(), force: forceSay)
         case .stretch:
@@ -1293,6 +1318,7 @@ final class PetController {
     }
 
     private func behave(_ dt: CGFloat, _ f: NSRect) {
+        if action != .flip { view.hop = 0 }
         switch action {
         case .idle, .leap, .climbEdge:
             view.mood = .idle
@@ -1318,6 +1344,15 @@ final class PetController {
             view.spin = sin(view.time * 10) * 0.1
         case .mope:
             view.mood = .sad
+        case .power:
+            view.mood = .power
+            if species == .dino { view.spin = sin(view.time * 44) * 0.045 }      // shaking with the roar
+        case .flip:
+            // up, all the way round, and back down on its feet
+            let t = CGFloat(min(1, max(0, 1 - remaining / flipLength)))
+            view.mood = .jump
+            view.spin = -facing * 2 * .pi * t
+            view.hop = sin(t * .pi) * 34
         case .hide:
             hideAndPeek(dt, f)
         case .visit:

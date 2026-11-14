@@ -1,6 +1,6 @@
 import AppKit
 
-enum Mood { case idle, walk, sleep, happy, chase, held, jump, dance, stretch, dizzy, sad }
+enum Mood { case idle, walk, sleep, happy, chase, held, jump, dance, stretch, dizzy, sad, power }
 
 struct Heart {
     var x: CGFloat
@@ -27,6 +27,7 @@ final class PetView: NSView {
     var outfit: Outfit = .none           // what the pet is wearing
     var sweat = false                    // the Mac is working hard
     var shiver = false                   // the battery is nearly empty
+    var hop: CGFloat = 0                 // extra height off the ground (backflips)
     var tap: CGFloat = 0                 // 1 right after a key press, fades fast: a little bop while you type
     var isPreview = false                // settings-panel mini version
 
@@ -145,6 +146,7 @@ final class PetView: NSView {
         case .stretch: squash = 1.18 + 0.07 * sin(t * 5)
         case .dizzy: squash = 1 + 0.03 * sin(t * 3)
         case .sad:   squash = 0.94 + 0.015 * sin(t * 1.5)    // slumped
+        case .power: squash = 1.08 + 0.03 * sin(t * 22)      // puffed up and trembling with effort
         case .idle:  break
         }
         // Bob to the beat while music plays.
@@ -158,6 +160,7 @@ final class PetView: NSView {
             lift += tap * 3.5
             squash -= tap * 0.045
         }
+        lift += hop
         // Ghosts float.
         let hover: CGFloat = sp == .ghost ? (mood == .sleep ? 1 : 7 + sin(t * 3) * 2.5) : 0
 
@@ -168,6 +171,9 @@ final class PetView: NSView {
         case .bunny: baseW = 68; baseH = 58
         case .penguin: baseW = 70; baseH = 68
         case .ghost: baseW = 68; baseH = 66
+        case .dino: baseW = 76; baseH = 62
+        case .robot: baseW = 70; baseH = 60
+        case .dragon: baseW = 74; baseH = 60
         }
         let h = baseH * squash
         let w = baseW * (2 - squash)
@@ -185,6 +191,9 @@ final class PetView: NSView {
         case .bunny: drawBunnyTail(body); drawBunnyEars(ctx, body)
         case .penguin: drawPenguinTuft(body); drawFlippers(ctx, body)
         case .ghost: drawGhostArms(ctx, body)
+        case .dino: drawDinoTail(body); drawDinoSpikes(body)
+        case .robot: drawRobotParts(body)
+        case .dragon: drawDragonTail(body); drawDragonWings(body); drawDragonHorns(body)
         }
 
         // Body: flat colour, markings, soft shading, then the outline on top
@@ -194,10 +203,14 @@ final class PetView: NSView {
         NSGraphicsContext.saveGraphicsState()
         path.addClip()
         if sp == .penguin { drawPenguinMarkings(body) }
-        if sp == .cat {
-            NSColor(calibratedRed: 1, green: 0.93, blue: 0.82, alpha: 1).setFill()
-            NSBezierPath(ovalIn: NSRect(x: body.midX - 15, y: body.minY - 4, width: 30, height: h * 0.36)).fill()
+        if sp == .cat || sp == .dino || sp == .dragon {
+            // pale tummy
+            (sp == .dino ? NSColor(calibratedRed: 0.90, green: 0.96, blue: 0.74, alpha: 1)
+                         : NSColor(calibratedRed: 1, green: 0.93, blue: 0.82, alpha: 1)).setFill()
+            let bw: CGFloat = sp == .cat ? 30 : 36
+            NSBezierPath(ovalIn: NSRect(x: body.midX + facing * 2 - bw / 2, y: body.minY - 4, width: bw, height: h * (sp == .cat ? 0.36 : 0.42))).fill()
         }
+        if sp == .robot { drawRobotPanel(body) }
         drawShading(body)
         NSGraphicsContext.restoreGraphicsState()
         sp.outline.setStroke()
@@ -206,9 +219,11 @@ final class PetView: NSView {
         if sp != .ghost { drawFeet(body) }          // little paws peeking out in front
         if sp == .penguin { drawScarf(ctx, body) }
         if sp == .bunny { drawBow(ctx, body) }
+        if sp == .dino { drawDinoArms(ctx, body) }
 
         drawFace(body)
         drawOutfit(ctx, body)
+        if mood == .power { drawPower(body) }
         if sweat, mood != .sleep { drawSweat(body) }
         if musicBpm > 0 { drawHeadphones(body) }
         if mood == .sleep { drawZs(near: body) }
@@ -247,7 +262,7 @@ final class PetView: NSView {
         species.shade.setFill()
         rim.fill()
 
-        if species == .cat || species == .penguin {
+        if species == .cat || species == .penguin || species == .dino || species == .dragon || species == .robot {
             NSColor.white.withAlphaComponent(species == .penguin ? 0.22 : 0.45).setFill()
             let g = NSBezierPath(ovalIn: NSRect(x: -6, y: -3, width: 12, height: 6))
             var t = AffineTransform(translationByX: body.minX + w * 0.25, byY: body.maxY - h * 0.2)
@@ -265,6 +280,10 @@ final class PetView: NSView {
             return gumdrop(body, belly: 0.42, top: 0.29)
         case .penguin:
             return gumdrop(body, belly: 0.36, top: 0.26)
+        case .dino, .dragon:
+            return gumdrop(body, belly: 0.40, top: 0.30)
+        case .robot:
+            return NSBezierPath(roundedRect: body, xRadius: 18, yRadius: 18)
         case .ghost:
             // dome on top, wavy hem at the bottom
             let r = body.width / 2
@@ -476,6 +495,206 @@ final class PetView: NSView {
         }
     }
 
+    // MARK: Rex the dino
+
+    private func drawDinoTail(_ body: NSRect) {
+        let dir = -facing
+        let base = NSPoint(x: body.midX + dir * (body.width / 2 - 8), y: body.minY + body.height * 0.24)
+        let wag = sin(time * (mood == .walk || mood == .chase ? 9 : 2.5)) * 4
+        let tail = NSBezierPath()
+        tail.move(to: NSPoint(x: base.x, y: base.y + 13))
+        tail.curve(to: NSPoint(x: base.x + dir * 27, y: base.y + 6 + wag),
+                   controlPoint1: NSPoint(x: base.x + dir * 12, y: base.y + 14), controlPoint2: NSPoint(x: base.x + dir * 22, y: base.y + 11 + wag))
+        tail.curve(to: NSPoint(x: base.x, y: base.y - 8),
+                   controlPoint1: NSPoint(x: base.x + dir * 20, y: base.y - 3 + wag), controlPoint2: NSPoint(x: base.x + dir * 10, y: base.y - 8))
+        tail.close(); tail.lineJoinStyle = .round
+        species.fur.setFill(); tail.fill()
+        species.outline.setStroke(); tail.lineWidth = 2.5; tail.stroke()
+    }
+
+    /// A row of orange plates along the head and back.
+    private func drawDinoSpikes(_ body: NSRect) {
+        let a = body.width / 2, cy = body.minY + body.height * 0.40, b = body.height * 0.60
+        for k in [CGFloat(-0.12), 0.20, 0.50, 0.76] {
+            let x = body.midX - facing * k * a
+            let y = cy + b * sqrt(max(0, 1 - k * k)) - 4
+            let lean = -facing * k * 7
+            let spike = NSBezierPath()
+            spike.move(to: NSPoint(x: x - 7, y: y))
+            spike.curve(to: NSPoint(x: x + 7, y: y), controlPoint1: NSPoint(x: x - 3 + lean, y: y + 15), controlPoint2: NSPoint(x: x + 3 + lean, y: y + 15))
+            spike.close(); spike.lineJoinStyle = .round
+            NSColor(calibratedRed: 1.00, green: 0.68, blue: 0.30, alpha: 1).setFill(); spike.fill()
+            NSColor(calibratedRed: 0.72, green: 0.40, blue: 0.12, alpha: 1).setStroke(); spike.lineWidth = 2; spike.stroke()
+        }
+    }
+
+    /// Famously tiny arms.
+    private func drawDinoArms(_ ctx: CGContext, _ body: NSRect) {
+        let excited = mood == .happy || mood == .dance || mood == .power || mood == .held
+        for (i, off) in [CGFloat(0.30), 0.44].enumerated() {
+            let wave = excited ? sin(time * 16 + CGFloat(i) * 2) * 0.5 : sin(time * 2 + CGFloat(i)) * 0.08
+            ctx.saveGState()
+            ctx.translateBy(x: body.midX + facing * body.width * off, y: body.minY + body.height * 0.24)
+            ctx.rotate(by: facing * (0.9 + wave))
+            let arm = NSBezierPath(roundedRect: NSRect(x: -2.5, y: -8, width: 5, height: 9), xRadius: 2.5, yRadius: 2.5)
+            species.fur.setFill(); arm.fill()
+            species.outline.setStroke(); arm.lineWidth = 1.8; arm.stroke()
+            ctx.restoreGState()
+        }
+    }
+
+    // MARK: Bolt the robot
+
+    /// Antenna and ear bolts, behind the body.
+    private func drawRobotParts(_ body: NSRect) {
+        let metal = NSColor(calibratedRed: 0.62, green: 0.70, blue: 0.82, alpha: 1)
+        let wob = sin(time * 3) * 1.5
+        let rod = NSBezierPath()
+        rod.move(to: NSPoint(x: body.midX, y: body.maxY - 3))
+        rod.line(to: NSPoint(x: body.midX + wob, y: body.maxY + 11))
+        rod.lineCapStyle = .round
+        rod.lineWidth = 5; species.outline.setStroke(); rod.stroke()
+        rod.lineWidth = 2; metal.setStroke(); rod.stroke()
+        // the light blinks, and glows steady when it's excited
+        let on = mood == .happy || mood == .dance || mood == .power || fmod(time, 1.4) < 0.7
+        let bulb = NSBezierPath(ovalIn: NSRect(x: body.midX + wob - 5, y: body.maxY + 8, width: 10, height: 10))
+        (on ? NSColor(calibratedRed: 1.00, green: 0.42, blue: 0.48, alpha: 1) : NSColor(calibratedRed: 0.60, green: 0.30, blue: 0.36, alpha: 1)).setFill()
+        bulb.fill()
+        species.outline.setStroke(); bulb.lineWidth = 2; bulb.stroke()
+
+        for side in [CGFloat(-1), 1] {
+            let ear = NSBezierPath(roundedRect: NSRect(x: body.midX + side * (body.width / 2 + 1) - 5, y: body.minY + body.height * 0.42,
+                                                       width: 10, height: 16), xRadius: 4, yRadius: 4)
+            metal.setFill(); ear.fill()
+            species.outline.setStroke(); ear.lineWidth = 2.2; ear.stroke()
+        }
+    }
+
+    /// Three little status lights on the tummy.
+    private func drawRobotPanel(_ body: NSRect) {
+        let colors = [NSColor.systemRed, NSColor.systemYellow, NSColor.systemGreen]
+        for (i, c) in colors.enumerated() {
+            let lit = Int(time * 2.5) % 3 == i || mood == .power
+            c.withAlphaComponent(lit ? 1 : 0.35).setFill()
+            NSBezierPath(ovalIn: NSRect(x: body.midX + facing * 2 + CGFloat(i - 1) * 8 - 2.5, y: body.minY + 6, width: 5, height: 5)).fill()
+        }
+    }
+
+    // MARK: Ember the dragon
+
+    private func drawDragonTail(_ body: NSRect) {
+        let dir = -facing
+        let base = NSPoint(x: body.midX + dir * (body.width / 2 - 8), y: body.minY + body.height * 0.26)
+        let wag = sin(time * (mood == .walk || mood == .chase ? 9 : 3)) * 6
+        let end = NSPoint(x: base.x + dir * 22 + wag, y: base.y + 24)
+        let p = NSBezierPath()
+        p.move(to: base)
+        p.curve(to: end, controlPoint1: NSPoint(x: base.x + dir * 24, y: base.y), controlPoint2: NSPoint(x: base.x + dir * 28 + wag, y: base.y + 13))
+        p.lineCapStyle = .round
+        p.lineWidth = 10; species.outline.setStroke(); p.stroke()
+        p.lineWidth = 5.5; species.fur.setStroke(); p.stroke()
+        // a little flame at the tip
+        let flick = sin(time * 12) * 1.5
+        let flame = NSBezierPath()
+        flame.move(to: NSPoint(x: end.x - 6, y: end.y))
+        flame.curve(to: NSPoint(x: end.x + flick, y: end.y + 15), controlPoint1: NSPoint(x: end.x - 7, y: end.y + 7), controlPoint2: NSPoint(x: end.x - 2, y: end.y + 9))
+        flame.curve(to: NSPoint(x: end.x + 6, y: end.y), controlPoint1: NSPoint(x: end.x + 3, y: end.y + 9), controlPoint2: NSPoint(x: end.x + 7, y: end.y + 7))
+        flame.curve(to: NSPoint(x: end.x - 6, y: end.y), controlPoint1: NSPoint(x: end.x + 5, y: end.y - 6), controlPoint2: NSPoint(x: end.x - 5, y: end.y - 6))
+        flame.lineJoinStyle = .round
+        NSColor(calibratedRed: 1.00, green: 0.78, blue: 0.26, alpha: 1).setFill(); flame.fill()
+        NSColor(calibratedRed: 0.86, green: 0.40, blue: 0.10, alpha: 1).setStroke(); flame.lineWidth = 1.8; flame.stroke()
+    }
+
+    private func drawDragonWings(_ body: NSRect) {
+        let active = mood == .walk || mood == .chase || mood == .happy || mood == .jump || mood == .held || mood == .power
+        let flap = mood == .sleep ? -5 : sin(time * (active ? 15 : 3.5)) * (active ? 7 : 3)
+        for side in [CGFloat(-1), 1] {
+            let o = NSPoint(x: body.midX + side * (body.width / 2 - 6), y: body.minY + body.height * 0.52)
+            let wing = NSBezierPath()
+            wing.move(to: o)
+            wing.line(to: NSPoint(x: o.x + side * 19, y: o.y + 13 + flap))
+            wing.curve(to: NSPoint(x: o.x + side * 17, y: o.y + 2 + flap * 0.5), controlPoint1: NSPoint(x: o.x + side * 18, y: o.y + 10 + flap), controlPoint2: NSPoint(x: o.x + side * 16, y: o.y + 6 + flap * 0.5))
+            wing.curve(to: NSPoint(x: o.x + side * 11, y: o.y - 7), controlPoint1: NSPoint(x: o.x + side * 16, y: o.y - 2), controlPoint2: NSPoint(x: o.x + side * 13, y: o.y - 4))
+            wing.curve(to: NSPoint(x: o.x, y: o.y - 9), controlPoint1: NSPoint(x: o.x + side * 8, y: o.y - 6), controlPoint2: NSPoint(x: o.x + side * 4, y: o.y - 6))
+            wing.close(); wing.lineJoinStyle = .round
+            NSColor(calibratedRed: 1.00, green: 0.74, blue: 0.46, alpha: 1).setFill(); wing.fill()
+            species.outline.setStroke(); wing.lineWidth = 2.2; wing.stroke()
+        }
+    }
+
+    private func drawDragonHorns(_ body: NSRect) {
+        for side in [CGFloat(-1), 1] {
+            let x = body.midX + side * body.width * 0.20, y = body.maxY - 7
+            let horn = NSBezierPath()
+            horn.move(to: NSPoint(x: x - 5, y: y))
+            horn.curve(to: NSPoint(x: x + side * 6, y: y + 18), controlPoint1: NSPoint(x: x - 4, y: y + 8), controlPoint2: NSPoint(x: x + side * 1, y: y + 13))
+            horn.curve(to: NSPoint(x: x + 5, y: y), controlPoint1: NSPoint(x: x + side * 5, y: y + 9), controlPoint2: NSPoint(x: x + 5, y: y + 5))
+            horn.close(); horn.lineJoinStyle = .round
+            NSColor(calibratedRed: 1.00, green: 0.94, blue: 0.82, alpha: 1).setFill(); horn.fill()
+            species.outline.setStroke(); horn.lineWidth = 2; horn.stroke()
+        }
+    }
+
+    // MARK: Power moves
+
+    /// Where the mouth is, shared by the face and the effects that come out of it.
+    private func eyeLine(_ body: NSRect) -> CGFloat {
+        body.minY + body.height * (species == .ghost ? 0.60 : (species == .penguin ? 0.56 : 0.50))
+    }
+
+    private func drawPower(_ body: NSRect) {
+        let fx = body.midX + facing * 5
+        let mouth = NSPoint(x: fx + facing * 6, y: eyeLine(body) - 11)
+        switch species {
+        case .dragon:
+            // a jet of fire, growing and fading as it leaves the mouth
+            for i in 0..<5 {
+                let ph = fmod(time * 2.4 + CGFloat(i) * 0.2, 1)
+                let c = NSPoint(x: mouth.x + facing * (5 + ph * 34), y: mouth.y + sin(ph * 7 + CGFloat(i)) * 3)
+                let r = 4.5 + ph * 8
+                NSColor(calibratedRed: 1.00, green: 0.45, blue: 0.12, alpha: 1 - ph).setFill()
+                NSBezierPath(ovalIn: NSRect(x: c.x - r, y: c.y - r, width: r * 2, height: r * 2)).fill()
+                NSColor(calibratedRed: 1.00, green: 0.88, blue: 0.35, alpha: 1 - ph).setFill()
+                NSBezierPath(ovalIn: NSRect(x: c.x - r * 0.5, y: c.y - r * 0.5, width: r, height: r)).fill()
+            }
+        case .robot:
+            // crackling bolts of electricity
+            NSColor(calibratedRed: 1.00, green: 0.86, blue: 0.25, alpha: 1).setStroke()
+            for (i, a) in [CGFloat(0.5), 1.4, 2.5, -0.4].enumerated() where Int(time * 12 + CGFloat(i) * 1.7) % 2 == 0 {
+                let c = NSPoint(x: body.midX + cos(a) * (body.width / 2 + 9), y: body.midY + sin(a) * (body.height / 2 + 9))
+                let z = NSBezierPath()
+                z.move(to: NSPoint(x: c.x - 3, y: c.y + 8)); z.line(to: NSPoint(x: c.x + 2, y: c.y + 1))
+                z.line(to: NSPoint(x: c.x - 2, y: c.y - 1)); z.line(to: NSPoint(x: c.x + 3, y: c.y - 8))
+                z.lineWidth = 2.4; z.lineJoinStyle = .round; z.lineCapStyle = .round; z.stroke()
+            }
+        case .dino, .ghost:
+            // sound waves from a mighty roar (or a very loud "boo")
+            for i in 0..<3 {
+                let ph = fmod(time * 1.8 + CGFloat(i) / 3, 1)
+                let wave = NSBezierPath()
+                let mid: CGFloat = facing > 0 ? 0 : 180
+                wave.appendArc(withCenter: mouth, radius: 9 + ph * 24, startAngle: mid - 38, endAngle: mid + 38)
+                wave.lineWidth = 2.6; wave.lineCapStyle = .round
+                species.outline.withAlphaComponent(1 - ph).setStroke(); wave.stroke()
+            }
+        default:
+            // a burst of twinkling stars
+            for i in 0..<6 {
+                let a = CGFloat(i) * .pi / 3 + time * 1.5
+                let tw = 0.5 + 0.5 * sin(time * 9 + CGFloat(i) * 2)
+                let c = NSPoint(x: body.midX + cos(a) * (body.width / 2 + 10), y: body.midY + sin(a) * (body.height / 2 + 8))
+                let r = 2.5 + tw * 3.5
+                let star = NSBezierPath()
+                star.move(to: NSPoint(x: c.x, y: c.y + r))
+                for (dx, dy) in [(CGFloat(0.28), CGFloat(0.28)), (1, 0), (0.28, -0.28), (0, -1), (-0.28, -0.28), (-1, 0), (-0.28, 0.28)] {
+                    star.line(to: NSPoint(x: c.x + dx * r, y: c.y + dy * r))
+                }
+                star.close()
+                NSColor(calibratedRed: 1.00, green: 0.84, blue: 0.28, alpha: 0.5 + tw * 0.5).setFill(); star.fill()
+            }
+        }
+    }
+
     /// A limb that hangs from `pivot` and swings by `ang` (positive = counter-clockwise).
     private func drawLimb(_ ctx: CGContext, pivot: NSPoint, size: NSSize, ang: CGFloat) {
         ctx.saveGState()
@@ -492,7 +711,7 @@ final class PetView: NSView {
             var ang = side * 0.3
             switch mood {
             case .walk, .chase: ang += sin(time * 10 + (side < 0 ? 0 : .pi)) * 0.28
-            case .happy, .dance, .jump: ang = side * (2.2 + sin(time * 14) * 0.35)
+            case .happy, .dance, .jump, .power: ang = side * (2.2 + sin(time * 14) * 0.35)
             case .stretch: ang = side * 2.6
             case .held: ang = side * (2.0 + sin(time * 20) * 0.4)
             case .sleep: ang = side * 0.12
@@ -553,9 +772,11 @@ final class PetView: NSView {
     private func drawFace(_ body: NSRect) {
         let sp = species
         let ink = sp.ink
-        let eyeY = body.minY + body.height * (sp == .ghost ? 0.60 : (sp == .penguin ? 0.56 : 0.50))
+        let eyeY = eyeLine(body)
         let spread: CGFloat
         switch sp {
+        case .dino, .dragon: spread = 12.5
+        case .robot: spread = 11.5
         case .mochi: spread = 13.5
         case .cat: spread = 12.5
         case .bunny: spread = 11.5
@@ -565,13 +786,20 @@ final class PetView: NSView {
         let fx = body.midX + facing * (sp == .mochi ? 6 : 5)
         let blinking = fmod(time + 1.3, 4.3) < 0.12
         let sad = mood == .sad
-        let open = mood == .happy || mood == .held || mood == .stretch || mood == .dance
+        let open = mood == .happy || mood == .held || mood == .stretch || mood == .dance || mood == .power
         let cream = NSColor(calibratedRed: 1, green: 0.93, blue: 0.82, alpha: 1)
 
         // Cat muzzle sits under everything else on the face
         if sp == .cat {
             cream.setFill()
             NSBezierPath(ovalIn: NSRect(x: fx - 13, y: eyeY - 17, width: 26, height: 15)).fill()
+        }
+
+        // Bolt's face is a little screen
+        if sp == .robot {
+            let screen = NSBezierPath(roundedRect: NSRect(x: fx - 25, y: eyeY - 16, width: 50, height: 29), xRadius: 10, yRadius: 10)
+            NSColor(calibratedRed: 0.12, green: 0.16, blue: 0.27, alpha: 1).setFill(); screen.fill()
+            sp.outline.setStroke(); screen.lineWidth = 1.6; screen.stroke()
         }
 
         // Rosy cheeks
@@ -591,6 +819,13 @@ final class PetView: NSView {
                 arc(NSPoint(x: ex, y: eyeY - 2.5), 5, 15, 165, width: 2.5)
             case .dizzy:
                 spiral(NSPoint(x: ex, y: eyeY), 6)
+            case .power:
+                // scrunched shut with effort:  >  <
+                let squint = NSBezierPath()
+                squint.move(to: NSPoint(x: ex - dx * 4.5, y: eyeY + 4.5))
+                squint.line(to: NSPoint(x: ex + dx * 3, y: eyeY))
+                squint.line(to: NSPoint(x: ex - dx * 4.5, y: eyeY - 4.5))
+                squint.lineWidth = 2.5; squint.lineCapStyle = .round; squint.lineJoinStyle = .round; squint.stroke()
             default:
                 let wide = mood == .held
                 let ew: CGFloat = wide ? 9.5 : 8.4
@@ -615,6 +850,20 @@ final class PetView: NSView {
             }
         }
 
+        if outfit == .shades {
+            let dark = NSColor(calibratedRed: 0.10, green: 0.10, blue: 0.14, alpha: 1)
+            for dx in [CGFloat(-1), 1] {
+                let lens = NSBezierPath(roundedRect: NSRect(x: fx + dx * spread - 8.5, y: eyeY - 6, width: 17, height: 12), xRadius: 4.5, yRadius: 4.5)
+                dark.setFill(); lens.fill()
+                NSColor.white.withAlphaComponent(0.55).setStroke()
+                let shine = NSBezierPath()
+                shine.move(to: NSPoint(x: fx + dx * spread - 4.5, y: eyeY + 3)); shine.line(to: NSPoint(x: fx + dx * spread - 1, y: eyeY + 3.6))
+                shine.lineWidth = 1.5; shine.lineCapStyle = .round; shine.stroke()
+            }
+            let bar = NSBezierPath()
+            bar.move(to: NSPoint(x: fx - spread + 6, y: eyeY + 3.5)); bar.line(to: NSPoint(x: fx + spread - 6, y: eyeY + 3.5))
+            bar.lineWidth = 2.4; dark.setStroke(); bar.stroke()
+        }
         if outfit == .glasses {
             let frame = NSColor(calibratedRed: 0.24, green: 0.20, blue: 0.30, alpha: 1)
             for dx in [CGFloat(-1), 1] {
@@ -695,6 +944,29 @@ final class PetView: NSView {
             if open { openMouth(NSPoint(x: fx, y: eyeY - 11), 8, 9) }
             else if sad { arc(NSPoint(x: fx, y: eyeY - 12.5), 3, 25, 155) }
             else { arc(NSPoint(x: fx, y: eyeY - 5.5), 3, 205, 335) }
+        case .dino, .dragon:
+            // nostrils, a wide grin and one little fang
+            ink.withAlphaComponent(0.55).setFill()
+            for dx in [CGFloat(-2.6), 2.6] {
+                NSBezierPath(ovalIn: NSRect(x: fx + dx - 1, y: eyeY - 3.5, width: 2, height: 2.4)).fill()
+            }
+            ink.setFill(); ink.setStroke()
+            if open { openMouth(NSPoint(x: fx, y: eyeY - 12.5), 10, 9) }
+            else if sad { arc(NSPoint(x: fx, y: eyeY - 14), 4, 25, 155) }
+            else {
+                arc(NSPoint(x: fx, y: eyeY - 6.5), 5, 200, 340)
+                let fang = NSBezierPath()
+                fang.move(to: NSPoint(x: fx + 1.6, y: eyeY - 11)); fang.line(to: NSPoint(x: fx + 3.2, y: eyeY - 14.5)); fang.line(to: NSPoint(x: fx + 4.8, y: eyeY - 10.4))
+                fang.close(); fang.lineJoinStyle = .round
+                NSColor.white.setFill(); fang.fill()
+                ink.setStroke(); fang.lineWidth = 0.9; fang.stroke()
+            }
+        case .robot:
+            // an LED mouth on the screen
+            if open {
+                NSBezierPath(roundedRect: NSRect(x: fx - 4.5, y: eyeY - 12.5, width: 9, height: 5.5), xRadius: 2.5, yRadius: 2.5).fill()
+            } else if sad { arc(NSPoint(x: fx, y: eyeY - 12.5), 3, 25, 155) }
+            else { arc(NSPoint(x: fx, y: eyeY - 6.5), 3.4, 205, 335) }
         }
     }
 
@@ -705,8 +977,47 @@ final class PetView: NSView {
         let top = NSPoint(x: body.midX + facing * 2, y: body.maxY)
         let line = NSColor(calibratedRed: 0.36, green: 0.26, blue: 0.30, alpha: 1)
         switch outfit {
-        case .none, .glasses:
+        case .none, .glasses, .shades:
             break
+
+        case .cap:
+            // a baseball cap with the brim pointing where the pet looks
+            let blue = NSColor(calibratedRed: 0.26, green: 0.52, blue: 0.96, alpha: 1)
+            let navy = NSColor(calibratedRed: 0.12, green: 0.24, blue: 0.56, alpha: 1)
+            let y = body.maxY - 7
+            let brim = NSBezierPath(roundedRect: NSRect(x: facing > 0 ? top.x + 2 : top.x - 26, y: y - 1, width: 24, height: 6), xRadius: 3, yRadius: 3)
+            navy.setFill(); brim.fill()
+            let dome = NSBezierPath()
+            dome.move(to: NSPoint(x: top.x - 15, y: y))
+            dome.curve(to: NSPoint(x: top.x + 15, y: y), controlPoint1: NSPoint(x: top.x - 14, y: y + 18), controlPoint2: NSPoint(x: top.x + 14, y: y + 18))
+            dome.close(); dome.lineJoinStyle = .round
+            blue.setFill(); dome.fill()
+            navy.setStroke(); dome.lineWidth = 1.8; dome.stroke()
+            NSColor.white.setFill()
+            NSBezierPath(ovalIn: NSRect(x: top.x - 2, y: y + 12, width: 4, height: 4)).fill()
+
+        case .headband:
+            // a ninja headband, knotted at the back with two tails in the wind
+            let red = NSColor(calibratedRed: 0.90, green: 0.22, blue: 0.26, alpha: 1)
+            let dark = NSColor(calibratedRed: 0.55, green: 0.10, blue: 0.14, alpha: 1)
+            let y = body.maxY - body.height * 0.20
+            let back = NSPoint(x: body.midX - facing * (body.width / 2 - 5), y: y + 3)
+            for (i, dy) in [CGFloat(5), -3].enumerated() {
+                let flutter = sin(time * 7 + CGFloat(i) * 1.5) * 3
+                let tail = NSBezierPath()
+                tail.move(to: back)
+                tail.curve(to: NSPoint(x: back.x - facing * 17, y: back.y + dy + flutter),
+                           controlPoint1: NSPoint(x: back.x - facing * 6, y: back.y + dy), controlPoint2: NSPoint(x: back.x - facing * 11, y: back.y + dy - flutter))
+                tail.lineCapStyle = .round
+                tail.lineWidth = 6; dark.setStroke(); tail.stroke()
+                tail.lineWidth = 3.4; red.setStroke(); tail.stroke()
+            }
+            NSGraphicsContext.saveGraphicsState()
+            bodyPath(body).addClip()
+            let band = NSBezierPath(rect: NSRect(x: body.minX - 2, y: y, width: body.width + 4, height: 7))
+            red.setFill(); band.fill()
+            dark.setStroke(); band.lineWidth = 1.6; band.stroke()
+            NSGraphicsContext.restoreGraphicsState()
 
         case .flower:
             // tucked behind one ear, on the side away from where the pet is looking

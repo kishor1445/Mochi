@@ -137,6 +137,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             item("Pet \(name)", "heart", #selector(petIt)),
             item("Come Here", "cursorarrow.rays", #selector(comeHere)),
             item("Do a Trick", "sparkles", #selector(trick)),
+            item("Power Move", "bolt", #selector(powerMove)),
             item("Go to Sleep", "moon.zzz", #selector(sleepNow)),
             item("Daily Check-in", "chart.bar", #selector(checkIn))
         ]))
@@ -179,6 +180,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     @objc private func sleepNow() { pet.sleepNow() }
     @objc private func checkIn() { pet.checkIn() }
     @objc private func trick() { pet.trick() }
+    @objc private func powerMove() { pet.powerMove() }
     @objc private func giveTreat() { pet.giveTreat() }
     @objc private func playBall() { pet.playBall() }
     @objc private func startFocus(_ sender: NSMenuItem) { pet.startFocus(minutes: sender.tag) }

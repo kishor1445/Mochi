@@ -143,7 +143,7 @@ struct PetTab: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            HStack(spacing: 8) {
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 4), spacing: 8) {
                 ForEach(Species.allCases) { sp in
                     PetCard(species: sp, selected: settings.species == sp)
                         .onTapGesture { settings.species = sp }
@@ -176,7 +176,8 @@ struct WardrobeRow: View {
                 }
                 .frame(width: 190)
                 if let next = Outfit.next(after: mind.level) {
-                    Text("\(next.label) unlocks at bond level \(next.unlockLevel)")
+                    let names = Outfit.allCases.filter { $0.unlockLevel == next.unlockLevel }.map(\.label)
+                    Text("Bond level \(next.unlockLevel) unlocks: \(names.joined(separator: ", "))")
                         .font(.caption).foregroundStyle(.secondary)
                 }
             }
@@ -320,7 +321,7 @@ struct TodayTab: View {
                          label: "Focus sessions", tint: .purple)
                 StatTile(symbol: "cup.and.saucer", value: "\(t.breaks)", label: "Breaks", tint: .orange)
                 StatTile(symbol: "heart", value: "\(t.pets + t.treats)", label: "Pets and treats", tint: .pink)
-                StatTile(symbol: "soccerball", value: "\(t.plays)", label: "Games played", tint: .green)
+                StatTile(symbol: "soccerball", value: "\(t.plays)", label: "Games played · best rally \(UserDefaults.standard.integer(forKey: "bestRally"))", tint: .green)
             }
             if let y = log.yesterday, !y.isEmpty {
                 Text(y.summary(prefix: "Yesterday"))
@@ -379,7 +380,7 @@ struct GeneralTab: View {
 // MARK: Window
 
 struct SettingsView: View {
-    static let size = NSSize(width: 520, height: 420)
+    static let size = NSSize(width: 520, height: 500)
 
     @ObservedObject var settings: PetSettings
     var onSayHi: () -> Void

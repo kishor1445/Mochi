@@ -2,6 +2,11 @@
 
 ## 0.5.0
 
+- Three new pets: Rex the dino, Bolt the robot and Ember the dragon, each with its own look, personality, lines, snack and toy
+- Power moves: Ember breathes fire, Bolt crackles with lightning, Rex roars, Boo shouts "BOO!", and the others burst into stars (Interact › Power Move, and on their own now and then)
+- Backflip added to the tricks
+- New outfits: cap, shades and ninja headband
+- Ball rallies are scored: the longer it goes, the likelier a miss, and the pet remembers your best rally
 - Throw and bounce: let go of the pet mid-swing and it flies, tumbles, bounces off the screen edges and lands dizzy
 - Second pet: switch on a companion in settings; the two run over to greet each other
 - Hide and peek: the pet sneaks to a screen edge, ducks behind it and pops out when you come looking

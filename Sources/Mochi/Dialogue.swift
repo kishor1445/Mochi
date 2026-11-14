@@ -67,6 +67,23 @@ enum Dialogue {
     static let typingLong = ["So productive today! 💪", "Still going! You're unstoppable.", "That's a lot of typing. Proud of you 💖"]
     static let typingFast = ["Whoa, fast fingers! ⌨️", "Speedy!! 💨", "Are your keys okay?! 🔥"]
 
+    // Power moves
+    static func power(_ s: Species) -> [String] {
+        switch s {
+        case .dragon: return ["FWOOOSH! 🔥", "Dragon breath!", "Too hot to handle!"]
+        case .robot: return ["Pew pew! ⚡️", "Laser mode: ON", "Maximum power!"]
+        case .dino: return ["RAAAWR!! 🦖", "Fear my mighty roar!", "ROAR! …was that scary?"]
+        case .ghost: return ["BOO!! 👻", "Spooky power!"]
+        default: return ["Ta-daa! ✨", "Special move!", "Power up! ⭐️"]
+        }
+    }
+
+    // Ball rally
+    static func rally(_ kicks: Int, record: Bool) -> String {
+        if record { return "\(kicks) kicks! New record! 🏆" }
+        return kicks <= 2 ? "Aw, missed! \(kicks) kick\(kicks == 1 ? "" : "s")." : "\(kicks) kicks! Good rally 💪"
+    }
+
     // Being thrown
     static let thrown = ["Wheeeee!", "I can flyyy!", "Yeet!!", "Not agaaain!"]
     static let crashLanded = ["Again! Again! 😵‍💫", "The room is spinning…", "Ten out of ten landing.", "Whoa… do that again!"]

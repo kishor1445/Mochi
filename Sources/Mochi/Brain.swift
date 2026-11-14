@@ -22,6 +22,8 @@ enum PetAction: Equatable {
     case mope                  // sits there looking sad (hungry or lonely)
     case hide                  // sneak to the screen edge, duck behind it, then peek out
     case visit                 // run over to the other pet and say hi
+    case power                 // signature move: fire, lasers, a mighty roar…
+    case flip                  // a backflip
 }
 
 struct Decision {
@@ -103,7 +105,8 @@ final class MindBrain: Brain {
             case .music, .other:
                 let fan: Double = ctx.media == .music ? 9 : 4
                 o = [(fan, d(.dance, 6, 10)), (3, d(.idle, 2, 4)), (4, d(.walk(axis: axis), 2, 6)),
-                     (2, d(.happy, 1.5, 2)), (1.5, d(.spin, 0.9, 0.9)), (1, d(.zoomies, 3, 4))]
+                     (2, d(.happy, 1.5, 2)), (1.5, d(.spin, 0.9, 0.9)), (1, d(.zoomies, 3, 4)),
+                 (1.5, d(.flip, 0.8, 0.8)), (1, d(.power, 2.2, 2.2))]
                 if ctx.cursorDistance < 500 { o.append((2, d(.chase, 3, 6))) }
                 if tired { o.append((2, d(.sleep, 10, 20))) }
 
@@ -111,7 +114,8 @@ final class MindBrain: Brain {
                 if ctx.surface == .floor || ctx.surface == .air {
                     o = [(6, d(.idle, 2, 5)), (10, d(.walk(axis: axis), 2, 7)), (1.5, d(.happy, 1.5, 1.5)),
                          (2, d(.stretch, 2.4, 2.4)), (1.5, d(.spin, 0.9, 0.9)), (1.5, d(.dance, 4, 4)),
-                         (2.5, d(.lookAround, 3, 3)), (1.5, d(.zoomies, 3.5, 3.5))]
+                         (2.5, d(.lookAround, 3, 3)), (1.5, d(.zoomies, 3.5, 3.5)),
+                     (1.2, d(.power, 2.2, 2.2)), (1.2, d(.flip, 0.8, 0.8))]
                 } else {
                     // Clinging to an edge: it's mostly busy climbing around.
                     o = [(3, d(.idle, 2, 4)), (14, d(.walk(axis: axis), 3, 9)), (1.5, d(.lookAround, 2, 3)),
@@ -142,7 +146,7 @@ final class MindBrain: Brain {
             switch a {
             case .sleep:
                 return p.sleepy * (tired ? 4 : 1) * (ctx.energy > 0.8 && !late ? 0.4 : 1)
-            case .dance, .zoomies, .spin, .hide:
+            case .dance, .zoomies, .spin, .hide, .power, .flip:
                 return p.playful * (joyful ? 1.6 : 1) * (tired ? 0.2 : 1) * (lonely || hungry ? 0.4 : 1)
             case .happy:
                 return joyful ? 1.8 : (lonely || hungry ? 0.3 : 1)

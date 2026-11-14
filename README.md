@@ -1,6 +1,6 @@
 # Mochi 🍡
 
-A tiny desktop pet for macOS. Pick one of five pets and it lives on your screen: it wanders along the Dock,
+A tiny desktop pet for macOS. Pick one of eight pets and it lives on your screen: it wanders along the Dock,
 climbs the screen edges, hangs from the top, stands on your windows, says hi, and reacts when you
 click, drag or ignore it.
 
@@ -24,6 +24,9 @@ and runs offline, but the pet's decisions go through a single `Brain` interface,
 | **Clover** 🐰 | Bouncy bunny with a pink bow whose ears flop when it sleeps. The most playful of the lot |
 | **Pip** 🐧 | Waddly, dapper penguin with a feather tuft and a red scarf who flaps when happy. Always hungry |
 | **Boo** 👻 | Floaty, friendly ghost with a wavy hem. Barely sleeps or eats |
+| **Rex** 🦖 | Stompy, brave dino with orange back plates and famously tiny arms. Always hungry, loves to roar |
+| **Bolt** 🤖 | Beepy, clever robot with a screen for a face and a blinking antenna. Curious and almost never sleeps |
+| **Ember** 🐲 | Fiery, bold dragon with little wings, horns and a flame on its tail. The most playful of all |
 
 Switch pets any time from the Pet tab in settings:
 
@@ -42,7 +45,9 @@ Switch pets any time from the Pet tab in settings:
 - **Throw and bounce**: let go of the pet mid-swing and it flies, tumbles, bounces off the screen edges and lands dizzy
 - **Second pet**: turn on a companion in settings and the two run over to greet each other
 - **Hide and peek**: it sneaks to a screen edge, ducks behind it and pops out when your cursor comes looking
-- **Outfits**: a flower, glasses, a party hat, a crown and a halo unlock as your bond levels up
+- **Outfits**: a flower, a cap, glasses, shades, a party hat, a ninja headband, a crown and a halo unlock as your bond levels up
+- **Power moves**: every pet has a signature move. Ember breathes fire, Bolt crackles with lightning, Rex roars
+- **Ball rallies**: playing ball is scored. The longer the rally, the likelier a miss, and the pet remembers your record
 
 **Looks after you**
 - **Gentle reminders**: water, posture and eye-rest nudges at intervals you choose, plus a stretch after 50 minutes of work. They count time you are actually at your Mac and wait for calls and focus sessions to end
@@ -74,7 +79,7 @@ Switch pets any time from the Pet tab in settings:
 - **Play ball**: drop a toy and the pet chases it along the Dock and kicks it back into the air
 - **Focus session** (15, 25 or 50 minutes): the pet keeps quiet and calm while you work, then celebrates with you
 - **Shake your mouse** at it and it gets dizzy
-- Tricks: yawn and stretch, spin, dance, look around, zoomies, nap
+- Tricks: yawn and stretch, spin, backflip, dance, look around, zoomies, power move, nap
 - Speech bubbles: random hellos, time-of-day greetings and pet-specific lines (Silent / Quiet / Normal / Chatty)
 - **Bring back to screen** button in case it ever wanders off
 - **Launch at login** (when run from the built `Mochi.app`)
