@@ -36,6 +36,9 @@ final class PetSettings: ObservableObject {
     @Published var walkOnWindows: Bool { didSet { d.set(walkOnWindows, forKey: "walkOnWindows") } }
     @Published var climbEdges: Bool { didSet { d.set(climbEdges, forKey: "climbEdges") } }
     @Published var followCursor: Bool { didSet { d.set(followCursor, forKey: "followCursor") } }
+    @Published var reactToMedia: Bool { didSet { d.set(reactToMedia, forKey: "reactToMedia") } }
+    @Published var breakReminders: Bool { didSet { d.set(breakReminders, forKey: "breakReminders") } }
+    @Published var systemAware: Bool { didSet { d.set(systemAware, forKey: "systemAware") } }
 
     private init() {
         species = Species(rawValue: d.string(forKey: "species") ?? "") ?? .mochi
@@ -43,5 +46,8 @@ final class PetSettings: ObservableObject {
         walkOnWindows = d.object(forKey: "walkOnWindows") as? Bool ?? true
         climbEdges = d.object(forKey: "climbEdges") as? Bool ?? true
         followCursor = d.object(forKey: "followCursor") as? Bool ?? true
+        reactToMedia = d.object(forKey: "reactToMedia") as? Bool ?? true
+        breakReminders = d.object(forKey: "breakReminders") as? Bool ?? true
+        systemAware = d.object(forKey: "systemAware") as? Bool ?? true
     }
 }

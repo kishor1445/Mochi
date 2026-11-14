@@ -10,7 +10,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         pet = PetController()
         settingsWindow = SettingsWindowController(onSayHi: { [weak self] in self?.pet.greet() },
-                                                  onBringBack: { [weak self] in self?.pet.bringBack() })
+                                                  onBringBack: { [weak self] in self?.pet.bringBack() },
+                                                  onTreat: { [weak self] in self?.pet.giveTreat() })
         pet.start()
 
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
@@ -32,6 +33,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(item("Say hi", #selector(sayHi)))
         menu.addItem(item("Pet \(name)", #selector(petIt)))
         menu.addItem(item("Come here", #selector(comeHere)))
+        menu.addItem(item("Give a treat \(PetSettings.shared.species.treatEmoji)", #selector(giveTreat)))
         menu.addItem(item("Do a trick", #selector(trick)))
         menu.addItem(item("Go to sleep", #selector(sleepNow)))
         menu.addItem(.separator())
@@ -53,6 +55,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc private func comeHere() { pet.comeHere() }
     @objc private func sleepNow() { pet.sleepNow() }
     @objc private func trick() { pet.trick() }
+    @objc private func giveTreat() { pet.giveTreat() }
     @objc private func bringBack() { pet.bringBack() }
     @objc private func openSettings() { settingsWindow.show() }
     @objc private func quit() { NSApp.terminate(nil) }

@@ -44,6 +44,7 @@ struct SettingsView: View {
     @ObservedObject var settings: PetSettings
     var onSayHi: () -> Void
     var onBringBack: () -> Void
+    var onTreat: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
@@ -73,13 +74,20 @@ struct SettingsView: View {
                 Toggle("Walk and leap onto windows", isOn: $settings.walkOnWindows)
                 Toggle("Climb screen edges and hang from the top", isOn: $settings.climbEdges)
                 Toggle("Chase my cursor sometimes", isOn: $settings.followCursor)
+                Toggle("React to music, videos and calls", isOn: $settings.reactToMedia)
+                Toggle("Remind me to take a break", isOn: $settings.breakReminders)
+                Toggle("Comment on battery and time of day", isOn: $settings.systemAware)
             }
 
             HStack {
                 Text("Tip: drag your pet to a screen edge and let go. It will cling there.")
                     .font(.caption).foregroundStyle(.secondary)
                 Spacer()
+            }
+            HStack {
                 Button("Bring back to screen", action: onBringBack)
+                Spacer()
+                Button("Give a treat \(settings.species.treatEmoji)", action: onTreat)
                 Button("Say hi!", action: onSayHi)
             }
         }
@@ -93,15 +101,17 @@ final class SettingsWindowController {
     private var window: NSWindow?
     private let onSayHi: () -> Void
     private let onBringBack: () -> Void
+    private let onTreat: () -> Void
 
-    init(onSayHi: @escaping () -> Void, onBringBack: @escaping () -> Void) {
+    init(onSayHi: @escaping () -> Void, onBringBack: @escaping () -> Void, onTreat: @escaping () -> Void) {
         self.onSayHi = onSayHi
         self.onBringBack = onBringBack
+        self.onTreat = onTreat
     }
 
     func show() {
         if window == nil {
-            let hosting = NSHostingController(rootView: SettingsView(settings: .shared, onSayHi: onSayHi, onBringBack: onBringBack))
+            let hosting = NSHostingController(rootView: SettingsView(settings: .shared, onSayHi: onSayHi, onBringBack: onBringBack, onTreat: onTreat))
             let w = NSWindow(contentViewController: hosting)
             w.title = "Pet Settings"
             w.styleMask = [.titled, .closable, .miniaturizable]

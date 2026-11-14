@@ -15,7 +15,8 @@ private struct Jump {
     var target: Platform
 }
 
-/// Owns the pet window, runs the 30fps loop, moves the pet over the dock, screen edges and windows.
+/// Owns the pet window, runs the 30fps loop, moves the pet over the dock, screen edges and windows,
+/// and reacts to music, treats, the cursor and what you are doing.
 ///
 /// Position is tracked as the window's centre (cx, cy). The pet's feet touch its surface
 /// `reach` points from the centre, which is why every surface snaps to `edge + reach`.
@@ -28,6 +29,7 @@ final class PetController {
     let view = PetView(frame: NSRect(origin: .zero, size: PetView.size))
     private let bubble = SpeechBubble()
     private let brain: Brain
+    private let audio = AudioWatcher()
     private var cancellables = Set<AnyCancellable>()
     private var timer: Timer?
 
@@ -40,6 +42,7 @@ final class PetController {
     private var targetAngle: CGFloat = 0
     private var held = false
     private var jump: Jump?
+    private var forceClimb = false
 
     // Platforms
     private var platform = Platform(id: 0, minX: 0, maxX: 0, top: 0)
@@ -61,6 +64,26 @@ final class PetController {
     private var nextGreeting = Date()
     private var clickStreak = 0
     private var lastClick = Date.distantPast
+
+    // Awareness
+    private var media: MediaActivity = .none
+    private var userAway = false
+    private var activeSeconds: TimeInterval = 0
+    private var lastSlow = Date.distantPast
+    private var lastHour = -1
+    private var lastBattery = Date.distantPast
+    private var batteryWarned = false
+    private var wasCharging: Bool?
+
+    // Cursor interactions
+    private var lastMouse = NSEvent.mouseLocation
+    private var lastMouseDelta = CGPoint.zero
+    private var shake: CGFloat = 0
+    private var dizzyCooldown = Date.distantPast
+    private var hoverTime: CGFloat = 0
+    private var hoverReacted = false
+
+    private var treat: Treat?
 
     private let chaseSpeed: CGFloat = 170
 
@@ -118,6 +141,7 @@ final class PetController {
 
     func start() {
         window.orderFrontRegardless()
+        audio.start()
         let t = Timer(timeInterval: 1.0 / 30.0, repeats: true) { [weak self] _ in self?.tick(1.0 / 30.0) }
         RunLoop.main.add(t, forMode: .common)
         timer = t
@@ -166,10 +190,52 @@ final class PetController {
         say("Coming!", force: true)
     }
 
+    /// Drops a snack from the top of the screen (under the mouse) for the pet to eat.
+    func giveTreat() {
+        guard treat == nil else { return }
+        touch()
+        let f = screenFrame
+        let x = clamp(NSEvent.mouseLocation.x, f.minX + 60, f.maxX - 60)
+        treat = Treat(emoji: settings.species.treatEmoji, x: x, y: f.maxY - 40)
+        say(Dialogue.treatDropped.randomElement() ?? "Ooh, a treat!", force: true)
+    }
+
+    /// A random trick, on demand (menu bar / right-click).
+    func trick() {
+        touch()
+        let options: [Decision] = [
+            Decision(action: .dance, duration: 4),
+            Decision(action: .spin, duration: 0.9),
+            Decision(action: .stretch, duration: 2.4),
+            Decision(action: .zoomies, duration: 3.5),
+            Decision(action: .lookAround, duration: 3)
+        ]
+        if canAct, let d = options.randomElement() { apply(d) }
+    }
+
+    /// Rescue: put the pet back on screen and let it drop in from the top.
+    func bringBack() {
+        touch()
+        held = false
+        jump = nil
+        let f = (NSScreen.main ?? NSScreen.screens[0]).visibleFrame
+        surface = .air
+        vy = 0
+        cx = f.midX
+        cy = f.maxY - 100
+        view.angle = 0
+        targetAngle = 0
+        view.spin = 0
+        window.setFrameOrigin(NSPoint(x: cx - Self.half, y: cy - Self.half))
+        window.orderFrontRegardless()
+        say("Phew, I'm back!", force: true)
+    }
+
     // MARK: Geometry
 
     private var screenFrame: NSRect { (window.screen ?? NSScreen.main ?? NSScreen.screens[0]).visibleFrame }
     private var hour: Int { Calendar.current.component(.hour, from: Date()) }
+    private var canAct: Bool { surface != .air && jump == nil && !held }
 
     private func dock(_ f: NSRect) -> Platform {
         Platform(id: 0, minX: f.minX + 52, maxX: f.maxX - 52, top: f.minY)
@@ -217,6 +283,11 @@ final class PetController {
         }
     }
 
+    private func isOnScreen() -> Bool {
+        let p = CGPoint(x: cx, y: cy)
+        return NSScreen.screens.contains { $0.frame.insetBy(dx: -20, dy: -20).contains(p) }
+    }
+
     // MARK: Platforms (windows)
 
     private func refreshPlatforms(_ now: Date, _ f: NSRect) {
@@ -261,9 +332,17 @@ final class PetController {
         view.advance(dt)
         if platform.id == 0 { platform = dock(f) }
         refreshPlatforms(now, f)
+        slowTick(now)
+
+        if let t = treat {
+            t.update(dt, floorY: f.minY - 2)
+            if now.timeIntervalSince(t.born) > 40 { t.remove(); treat = nil }
+        }
 
         // Safety net: if the pet ever ends up outside every screen, bring it back.
         if !held, !isOnScreen() { bringBack() }
+
+        trackCursor(dt, now)
 
         if held {
             cx = window.frame.midX
@@ -300,10 +379,18 @@ final class PetController {
                     finish(dt, f)
                     return
                 }
-                // The longer it hangs on, the more likely it slips (ceiling is harder).
-                let rate = (surface == .ceiling ? 0.02 : 0.012) + min(0.06, gripTime * 0.002)
-                if Double.random(in: 0..<1) < rate * Double(dt) { startSlip() }
+                // Grips are strong for the first ~30s, then slowly get tired.
+                // Roughly: a slip every minute or two of hanging around, rarer on walls than the ceiling.
+                let tired = max(0, gripTime - 30)
+                let rate = (surface == .ceiling ? 0.006 : 0.003) + min(0.02, tired * 0.0004)
+                if gripTime > 30, Double.random(in: 0..<1) < rate * Double(dt) { startSlip() }
             }
+
+            if let t = treat, handleTreat(t, dt, f) {
+                finish(dt, f)
+                return
+            }
+
             remaining -= TimeInterval(dt)
             maybeGreet(now)
             if remaining <= 0 { apply(brain.nextDecision(context(f))) }
@@ -345,6 +432,168 @@ final class PetController {
                 bubble.update(centerX: cx, aboveY: cy + 4 + head + 2, belowY: cy - 60, preferBelow: false, limit: f)
             }
         }
+    }
+
+    // MARK: Awareness (once a second)
+
+    private func slowTick(_ now: Date) {
+        guard now.timeIntervalSince(lastSlow) >= 1 else { return }
+        lastSlow = now
+
+        // What's playing?
+        let m = settings.reactToMedia ? audio.current : .none
+        if m != media { media = m; mediaChanged() }
+
+        // Is anyone there?
+        let idle = SystemInfo.userIdleSeconds()
+        if idle > 180, !userAway {
+            userAway = true
+            if canAct { action = .sleep; remaining = 600 }
+        } else if userAway, idle < 5 {
+            userAway = false
+            welcomeBack()
+        }
+
+        // Been working a long time?
+        if idle < 60 { activeSeconds += 1 } else if idle > 300 { activeSeconds = 0 }
+        if settings.breakReminders, activeSeconds >= 50 * 60, media != .call {
+            activeSeconds = 0
+            say("You've been at it for a while. Time to stretch! 🧘", force: true)
+            if canAct { apply(Decision(action: .stretch, duration: 3)) }
+        }
+
+        if settings.systemAware { checkHour(); checkBattery(now) }
+    }
+
+    private func mediaChanged() {
+        switch media {
+        case .music, .other:
+            view.musicBpm = .random(in: 100...126)
+            if media == .music { say("Ooh, music! 🎵") }
+            else if Bool.random() { say("Something's playing… 🎧") }
+            if canAct, !userAway { apply(Decision(action: .dance, duration: 7)) }
+        case .video:
+            view.musicBpm = 0
+            say("Movie time! 🍿")
+            if canAct, !userAway { apply(Decision(action: .idle, duration: 5)) }
+        case .call:
+            view.musicBpm = 0
+            say("Shh… I'll be quiet 🤫", force: true)
+            if canAct, !userAway { apply(Decision(action: .idle, duration: 5)) }
+        case .none:
+            if view.musicBpm > 0 { say("Aww, the music stopped 🥲") }
+            view.musicBpm = 0
+        }
+    }
+
+    private func welcomeBack() {
+        say("Welcome back! 👋")
+        view.spawnHearts(3)
+        if canAct { apply(Decision(action: .happy, duration: 2)) }
+    }
+
+    private func checkHour() {
+        let h = hour
+        defer { lastHour = h }
+        guard lastHour != -1, h != lastHour else { return }
+        switch h {
+        case 12: say("Lunch time! 🍱")
+        case 17: say("Almost done for the day? 🌇")
+        case 22: say("Getting late… bedtime soon? 🌙")
+        case 0: say("It's past midnight! Time to sleep? 😴")
+        default: break
+        }
+    }
+
+    private func checkBattery(_ now: Date) {
+        guard now.timeIntervalSince(lastBattery) >= 30 else { return }
+        lastBattery = now
+        guard let b = SystemInfo.battery() else { return }
+        if let was = wasCharging, !was, b.charging {
+            say("Ahh, power! ⚡")
+            view.spawnHearts(2)
+        }
+        wasCharging = b.charging
+        if b.level <= 15, !b.charging, !batteryWarned {
+            batteryWarned = true
+            say("Battery's at \(b.level)%. Plug me in? 🔋", force: true)
+        }
+        if b.charging || b.level > 30 { batteryWarned = false }
+    }
+
+    // MARK: Cursor interactions
+
+    private func trackCursor(_ dt: CGFloat, _ now: Date) {
+        let m = NSEvent.mouseLocation
+        let delta = CGPoint(x: m.x - lastMouse.x, y: m.y - lastMouse.y)
+        lastMouse = m
+
+        // Shaking the mouse hard near the pet makes it dizzy.
+        if hypot(delta.x, delta.y) / max(dt, 0.001) > 700 {
+            if delta.x * lastMouseDelta.x + delta.y * lastMouseDelta.y < 0 { shake += 1 }
+            lastMouseDelta = delta
+        }
+        shake = max(0, shake - dt * 1.5)
+
+        let dist = hypot(m.x - cx, m.y - (cy - 20))
+        let calm = canAct && !userAway
+        if shake >= 5, dist < 350, calm, now > dizzyCooldown {
+            shake = 0
+            dizzyCooldown = now.addingTimeInterval(15)
+            apply(Decision(action: .dizzy, duration: 2.8))
+            say("Whoa… everything's spinning 😵‍💫")
+        }
+
+        // Hovering the cursor over the pet without clicking gets a happy reaction.
+        if calm, dist < 48, action != .sleep, action != .dizzy {
+            hoverTime += dt
+            if hoverTime > 1.2, !hoverReacted {
+                hoverReacted = true
+                view.spawnHearts(2)
+                say(Dialogue.hover.randomElement() ?? "Hi!")
+                action = .happy
+                remaining = 1.2
+            }
+        } else if dist > 60 {
+            hoverTime = 0
+            hoverReacted = false
+        }
+    }
+
+    // MARK: Treats
+
+    /// Returns true while the pet is busy with the treat.
+    private func handleTreat(_ t: Treat, _ dt: CGFloat, _ f: NSRect) -> Bool {
+        // Treats land on the Dock floor: come down from walls, the ceiling or windows first.
+        if surface != .floor {
+            letGo()
+            return true
+        }
+        if platform.id != 0 {
+            surface = .air
+            vy = 0
+            cx += (t.x >= cx ? 1 : -1) * 30
+            return true
+        }
+        let dx = t.x - cx
+        if t.landed, abs(dx) < 28 {
+            t.remove()
+            treat = nil
+            view.spawnHearts(4)
+            say(Dialogue.yum.randomElement() ?? "Yum!", force: true)
+            apply(Decision(action: .happy, duration: 2.2))
+            return true
+        }
+        if abs(dx) > 12 {
+            facing = dx > 0 ? 1 : -1
+            view.mood = .chase
+            cx += facing * chaseSpeed * 1.1 * dt
+        } else {
+            view.mood = .idle
+        }
+        snap(f)
+        targetAngle = 0
+        return true
     }
 
     // MARK: Falling & landing
@@ -429,6 +678,7 @@ final class PetController {
         cx = window.frame.midX
         cy = window.frame.midY
         vy = 0
+        gripTime = 0
 
         // Let go close to a screen edge and the pet clings to it instead of dropping to the dock.
         let dl = cx - f.minX, dr = f.maxX - cx, dt = f.maxY - cy
@@ -456,6 +706,7 @@ final class PetController {
     private func apply(_ d: Decision, forceSay: Bool = false) {
         action = d.action
         remaining = d.duration
+        forceClimb = false
         switch d.action {
         case .walk(let axis):
             facing = map(axis, surface)
@@ -463,54 +714,29 @@ final class PetController {
             action = .idle
         case .leap:
             if !startLeap() { action = .idle; remaining = 1.5 }
+        case .climbEdge:
+            if surface == .floor, platform.id == 0, settings.climbEdges {
+                let toLeft = (cx - platform.minX) < (platform.maxX - cx)
+                let axis: CGFloat = toLeft ? -1 : 1
+                facing = map(axis, surface)
+                action = .walk(axis: axis)
+                forceClimb = true
+            } else {
+                action = .idle
+                remaining = 1.5
+            }
         case .greet:
             say(Dialogue.greeting(species: settings.species, hour: hour), force: forceSay)
         case .stretch:
             if Double.random(in: 0..<1) < 0.5 { say("*yaaawn*") }
         case .dance:
-            if Double.random(in: 0..<1) < 0.5 { say("♪ La la la ♪") }
+            if media == .none, Double.random(in: 0..<1) < 0.5 { say("♪ La la la ♪") }
         case .zoomies:
             if Double.random(in: 0..<1) < 0.5 { say("Zoomies!!") }
         default:
             break
         }
         view.spin = 0
-    }
-
-    /// A random trick, on demand (menu bar / right-click).
-    func trick() {
-        touch()
-        let options: [Decision] = [
-            Decision(action: .dance, duration: 4),
-            Decision(action: .spin, duration: 0.9),
-            Decision(action: .stretch, duration: 2.4),
-            Decision(action: .zoomies, duration: 3.5),
-            Decision(action: .lookAround, duration: 3)
-        ]
-        if surface != .air, jump == nil, !held, let d = options.randomElement() { apply(d) }
-    }
-
-    /// Rescue: put the pet back on screen and let it drop in from the top.
-    func bringBack() {
-        touch()
-        held = false
-        jump = nil
-        let f = (NSScreen.main ?? NSScreen.screens[0]).visibleFrame
-        surface = .air
-        vy = 0
-        cx = f.midX
-        cy = f.maxY - 100
-        view.angle = 0
-        targetAngle = 0
-        view.spin = 0
-        window.setFrameOrigin(NSPoint(x: cx - Self.half, y: cy - Self.half))
-        window.orderFrontRegardless()
-        say("Phew, I'm back!", force: true)
-    }
-
-    private func isOnScreen() -> Bool {
-        let p = CGPoint(x: cx, y: cy)
-        return NSScreen.screens.contains { $0.frame.insetBy(dx: -20, dy: -20).contains(p) }
     }
 
     private func scheduleGreeting(_ now: Date) {
@@ -524,19 +750,20 @@ final class PetController {
     private func maybeGreet(_ now: Date) {
         guard now >= nextGreeting else { return }
         scheduleGreeting(now)
-        if settings.chattiness != .off, action != .sleep, !bubble.visible {
+        if settings.chattiness != .off, action != .sleep, !bubble.visible, media != .call, media != .video, !userAway {
             apply(Decision(action: .greet, duration: 2.2))
         }
     }
 
     func say(_ text: String, force: Bool = false) {
         guard force || settings.chattiness != .off else { return }
+        if media == .call && !force { return }           // quiet during calls
         bubble.say(text)
     }
 
     private func behave(_ dt: CGFloat, _ f: NSRect) {
         switch action {
-        case .idle, .leap:
+        case .idle, .leap, .climbEdge:
             view.mood = .idle
             lookAtCursor()
         case .sleep:
@@ -555,6 +782,9 @@ final class PetController {
         case .spin:
             view.mood = .happy
             view.spin += 2 * .pi * dt / 0.9
+        case .dizzy:
+            view.mood = .dizzy
+            view.spin = sin(view.time * 10) * 0.1
         case .lookAround:
             view.mood = .idle
             facing = sin(view.time * 2.5) > 0 ? 1 : -1
@@ -620,7 +850,7 @@ final class PetController {
             let left = cx <= f.minX + 52 && s < 0
             let right = cx >= f.maxX - 52 && s > 0
             if left || right {
-                if Double.random(in: 0..<1) < 0.6 {
+                if Double.random(in: 0..<1) < 0.7 {
                     surface = left ? .leftWall : .rightWall
                     facing = map(-1, surface)              // head down the wall
                     snap(f)
@@ -629,7 +859,7 @@ final class PetController {
 
         case .leftWall, .rightWall:
             if cy >= f.maxY - 52 && s > 0 {
-                if Double.random(in: 0..<1) < 0.6 {
+                if Double.random(in: 0..<1) < 0.7 {
                     surface = .ceiling
                     facing = map(was == .leftWall ? 1 : -1, .ceiling)
                     snap(f)
@@ -648,7 +878,8 @@ final class PetController {
 
     private func floorEnd(_ f: NSRect, left: Bool, _ s: CGFloat) {
         if platform.id == 0 {
-            if settings.climbEdges && Double.random(in: 0..<1) < 0.5 {
+            if settings.climbEdges && (forceClimb || Double.random(in: 0..<1) < 0.5) {
+                forceClimb = false
                 surface = left ? .leftWall : .rightWall
                 facing = map(1, surface)                    // head up the wall
                 snap(f)
@@ -680,6 +911,9 @@ final class PetController {
                           cursorDistance: hypot(m.x - cx, m.y - cy),
                           secondsSinceInteraction: Date().timeIntervalSince(lastInteraction),
                           hour: hour,
-                          platformAbove: surface == .floor && windowPlatforms.contains { reachable($0, feet: feet) })
+                          platformAbove: surface == .floor && windowPlatforms.contains { reachable($0, feet: feet) },
+                          canClimb: surface == .floor && platform.id == 0 && settings.climbEdges,
+                          media: media,
+                          userAway: userAway)
     }
 }

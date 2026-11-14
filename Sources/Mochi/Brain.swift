@@ -17,6 +17,8 @@ enum PetAction: Equatable {
     case dance                 // wiggle with music notes
     case lookAround            // glance left and right
     case zoomies               // sprint back and forth
+    case climbEdge             // walk to the nearest screen edge on purpose and climb it
+    case dizzy                 // spiral eyes after the cursor is shaken at it
 }
 
 struct Decision {
@@ -32,6 +34,9 @@ struct PetContext {
     let secondsSinceInteraction: TimeInterval
     let hour: Int
     let platformAbove: Bool            // a window is within leaping reach
+    let canClimb: Bool                 // on the Dock floor with climbing enabled
+    let media: MediaActivity           // what is playing on the Mac
+    let userAway: Bool                 // nobody has touched the Mac for a while
 }
 
 /// The seam for future AI: anything that can pick the next Decision.
@@ -43,6 +48,8 @@ protocol Brain {
 /// Weighted-random behavior, no AI.
 struct RuleBrain: Brain {
     func nextDecision(_ ctx: PetContext) -> Decision {
+        if ctx.userAway { return Decision(action: .sleep, duration: 30) }
+
         let late = ctx.hour >= 23 || ctx.hour < 6
         let sleepy = ctx.secondsSinceInteraction > 180 || late
 
@@ -50,32 +57,55 @@ struct RuleBrain: Brain {
         if ctx.axisFraction < 0.12 { axis = 1 }
         if ctx.axisFraction > 0.88 { axis = -1 }
 
-        var options: [(weight: Double, decision: Decision)] = [
-            (6, Decision(action: .idle, duration: .random(in: 2...5))),
-            (10, Decision(action: .walk(axis: axis), duration: .random(in: 2...7))),
-            (1.5, Decision(action: .happy, duration: 1.5)),
-            (2, Decision(action: .stretch, duration: 2.4)),
-            (1.5, Decision(action: .spin, duration: 0.9)),
-            (1.5, Decision(action: .dance, duration: 4)),
-            (2.5, Decision(action: .lookAround, duration: 3)),
-            (1.5, Decision(action: .zoomies, duration: 3.5))
-        ]
-        if ctx.cursorDistance < 500 {
-            options.append((4, Decision(action: .chase, duration: .random(in: 3...6))))
+        func d(_ a: PetAction, _ lo: TimeInterval, _ hi: TimeInterval) -> Decision {
+            Decision(action: a, duration: .random(in: lo...hi))
         }
-        if sleepy {
-            options.append((6, Decision(action: .sleep, duration: .random(in: 8...20))))
-        }
-        if ctx.platformAbove && ctx.surface == .floor {
-            options.append((3, Decision(action: .leap, duration: 2)))
+        var o: [(Double, Decision)] = []
+
+        switch ctx.media {
+        case .call:
+            // On a call: stay quiet and still.
+            o = [(10, d(.idle, 4, 8)), (2, d(.lookAround, 2, 3))]
+            if sleepy { o.append((2, d(.sleep, 10, 20))) }
+
+        case .video:
+            // Watching along.
+            o = [(9, d(.idle, 5, 10)), (2, d(.lookAround, 2, 3)), (1, d(.stretch, 2, 3))]
+            if sleepy { o.append((3, d(.sleep, 10, 20))) }
+
+        case .music, .other:
+            let fan: Double = ctx.media == .music ? 9 : 4
+            o = [(fan, d(.dance, 6, 10)), (3, d(.idle, 2, 4)), (4, d(.walk(axis: axis), 2, 6)),
+                 (2, d(.happy, 1.5, 2)), (1.5, d(.spin, 0.9, 0.9)), (1, d(.zoomies, 3, 4))]
+            if ctx.cursorDistance < 500 { o.append((2, d(.chase, 3, 6))) }
+
+        case .none:
+            if ctx.surface == .floor || ctx.surface == .air {
+                o = [(6, d(.idle, 2, 5)), (10, d(.walk(axis: axis), 2, 7)), (1.5, d(.happy, 1.5, 1.5)),
+                     (2, d(.stretch, 2.4, 2.4)), (1.5, d(.spin, 0.9, 0.9)), (1.5, d(.dance, 4, 4)),
+                     (2.5, d(.lookAround, 3, 3)), (1.5, d(.zoomies, 3.5, 3.5))]
+            } else {
+                // Clinging to an edge: it's mostly busy climbing around.
+                o = [(3, d(.idle, 2, 4)), (14, d(.walk(axis: axis), 3, 9)), (1.5, d(.lookAround, 2, 3)),
+                     (1, d(.happy, 1.5, 1.5)), (1, d(.stretch, 2.4, 2.4))]
+            }
+            if ctx.cursorDistance < 500 { o.append((4, d(.chase, 3, 6))) }
+            if sleepy { o.append((6, d(.sleep, 8, 20))) }
         }
 
-        let total = options.reduce(0) { $0 + $1.weight }
-        var roll = Double.random(in: 0..<total)
-        for o in options {
-            roll -= o.weight
-            if roll < 0 { return o.decision }
+        if ctx.platformAbove && ctx.surface == .floor && ctx.media != .call {
+            o.append((3, Decision(action: .leap, duration: 2)))
         }
-        return options[0].decision
+        if ctx.canClimb && ctx.media != .call && ctx.media != .video {
+            o.append((3.5, d(.climbEdge, 10, 14)))
+        }
+
+        let total = o.reduce(0) { $0 + $1.0 }
+        var roll = Double.random(in: 0..<total)
+        for (w, dec) in o {
+            roll -= w
+            if roll < 0 { return dec }
+        }
+        return o[0].1
     }
 }

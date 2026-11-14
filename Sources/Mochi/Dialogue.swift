@@ -32,4 +32,7 @@ enum Dialogue {
     static let slipping = ["Uh oh…", "My grip!", "Hold on—", "I'm slipping!"]
     static let ouch = ["Ow! I'm okay.", "Ta-da! …on purpose.", "That was my plan all along.", "Nailed the landing!"]
     static let leaping = ["Hup!", "Boing!", "Up we go!"]
+    static let yum = ["Yum! 😋", "Nom nom nom!", "Delicious!", "Thank you! 💖"]
+    static let hover = ["Oh, hello there!", "You're so close!", "Boop?", "Hi hi hi!"]
+    static let treatDropped = ["Ooh, a treat!", "Food?!", "Is that for me?!"]
 }
