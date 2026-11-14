@@ -18,8 +18,8 @@ interface, so a smarter (LLM-powered) brain can be plugged in later without touc
 | Pet | Personality |
 | --- | --- |
 | **Mochi** 🍡 | Squishy and sleepy blob with a leaf sprout |
-| **Miso** 🐱 | Curious, sneaky cat with a wagging tail |
-| **Clover** 🐰 | Bouncy bunny whose ears flop when it sleeps |
+| **Pip** 🐧 | Waddly, dapper penguin in a red scarf who flaps when happy |
+| **Boo** 👻 | Floaty, friendly ghost with a wavy hem |
 
 Switch pets any time from the settings panel:
 
@@ -27,15 +27,32 @@ Switch pets any time from the settings panel:
 
 ## Features
 
-- **Lives on your whole screen**: walks the Dock, climbs the left and right edges, crawls along the
-  top, and comes back down
-- **Stands on your windows** and follows them when you move them; leaps up onto windows and hops off their edges
-- **Drag and drop**: let go near a screen edge and it clings there; let go mid-screen and it falls onto a window or the Dock
-- **Tricks**: yawn and stretch, spin, dance, look around, zoomies, nap (upside down on the ceiling if it likes)
-- **Reacts to you**: eyes follow your cursor, it sometimes chases it, click to pet it (hearts!), poke it while it sleeps
-- **Speech bubbles**: random hellos, time-of-day greetings and pet-specific lines (Silent / Quiet / Normal / Chatty)
+**Moves around your whole screen**
+- Walks the Dock, **climbs the left and right edges**, crawls along the top, and comes back down
+- Sometimes decides on its own to head for an edge and climb; its grip is strong, but after a long time hanging around it may slip and fall
+- Stands on top of your windows (and follows them), leaps up onto windows and hops off their edges
+- Drag and drop: let go near a screen edge and it clings there; let go mid-screen and it falls onto a window or the Dock
+- Stays stable when you swipe between Spaces and shows up over full-screen apps
+
+**Reacts to what is happening on your Mac** (no special permissions)
+- **Music** (Music, Spotify, ...): puts on headphones, bobs to the beat and dances
+- **Videos** (QuickTime, VLC, IINA, ...): settles down to watch ("Movie time! 🍿")
+- **Calls** (Zoom, Teams, FaceTime, Discord, ...): goes quiet and still
+- **Anything else making sound** (browsers, etc.): bobs along and sometimes dances
+- Falls asleep when you step away, and welcomes you back when you return
+- Reminds you to stretch after about 50 minutes of work, comments on low battery, plugging in and mealtimes
+
+**Interacts with you**
+- Eyes follow your cursor; it sometimes chases it and looks at you when you are near
+- Click to pet it (hearts!), click fast to make it blush, poke it while it sleeps
+- Hover over it for a moment and it perks up
+- **Give a treat**: a snack drops from the top of the screen and the pet runs over to eat it
+- **Shake your mouse** at it and it gets dizzy
+- Tricks: yawn and stretch, spin, dance, look around, zoomies, nap
+- Speech bubbles: random hellos, time-of-day greetings and pet-specific lines (Silent / Quiet / Normal / Chatty)
 - **Bring back to screen** button in case it ever wanders off
-- Lightweight: native Swift and AppKit, no dependencies, no Dock icon, no special permissions
+
+Lightweight: native Swift and AppKit, no dependencies, no Dock icon.
 
 ## Requirements
 
@@ -58,7 +75,7 @@ open dist/Mochi.app
 ```
 
 The build is ad-hoc signed, so on first launch macOS may ask you to right-click the app and choose
-**Open**. Mochi lives in the menu bar (🍡 / 🐱 / 🐰); there is no Dock icon.
+**Open**. Mochi lives in the menu bar (🍡 / 🐧 / 👻); there is no Dock icon.
 
 ## Controls
 
@@ -66,7 +83,7 @@ The build is ad-hoc signed, so on first launch macOS may ask you to right-click 
 | --- | --- |
 | Click the pet | Pets it (hearts and a happy hop) |
 | Drag and drop | Pick it up; let go near an edge to make it cling |
-| Right-click the pet or click the menu bar icon | Say hi, pet, come here, do a trick, sleep, bring back, settings, quit |
+| Right-click the pet or click the menu bar icon | Say hi, pet, come here, give a treat, do a trick, sleep, bring back, settings, quit |
 | `⌘ ,` / `⌘ B` (menu open) | Open settings / bring the pet back |
 
 ## How it works
@@ -81,13 +98,16 @@ frames, so no Screen Recording or Accessibility permission is needed.
 Sources/Mochi
 ├── main.swift             entry point
 ├── AppDelegate.swift      menu bar + right-click menu
-├── PetController.swift    window, 30fps loop, surfaces, physics, behaviour
+├── PetController.swift    window, 30fps loop, surfaces, physics, reactions
 ├── Brain.swift            PetAction, Brain protocol, RuleBrain (swap in AI here)
 ├── PetView.swift          drawing for every pet and mood, mouse input
 ├── Species.swift          pet definitions (colours, speed, lines)
 ├── Dialogue.swift         everything the pet says
 ├── SpeechBubble.swift     the speech bubble window
 ├── Platform.swift         finds window tops to stand on
+├── AudioWatcher.swift     notices which apps are playing sound (music / video / call)
+├── SystemInfo.swift       idle time and battery
+├── Treat.swift            the snack you can drop for the pet
 ├── PetSettings.swift      saved preferences (UserDefaults)
 ├── SettingsView.swift     SwiftUI settings panel
 └── Render.swift           `Mochi --render out.png` writes a preview sheet
@@ -96,7 +116,7 @@ Sources/Mochi
 ## Make it your own
 
 **Add a new pet:** add a case to `Species` (name, colours, speed, lines), then add its drawing branch in
-`PetView` (body size, ears/tail, face extras). Check how it looks without running the app:
+`PetView` (body shape, limbs, face extras). Check how it looks without running the app:
 
 ```bash
 swift run Mochi --render preview.png
@@ -118,7 +138,8 @@ then pass it to `PetController(brain:)`.
 ## Roadmap
 
 - [ ] AI brain that chats and decides what to do
-- [ ] More pets and more tricks (play with a ball, react to music)
+- [ ] Real beat detection (needs audio-capture permission)
+- [ ] More pets and more tricks (play with a ball, hide and peek)
 - [ ] Multi-monitor roaming
 - [ ] Launch at login
 

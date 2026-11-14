@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.2.0
+
+- New pets: Pip the penguin and Boo the ghost (replacing the cat and bunny)
+- Reacts to sound: headphones and dancing for music, quiet for calls, watching for videos
+- Notices when you step away (sleeps) and come back; break reminders; battery and time-of-day comments
+- Give a treat: a snack drops and the pet runs to eat it
+- Hover reaction and getting dizzy when you shake the mouse at it
+- Decides on its own to climb the screen edges; grip is much stronger and only slips after a long time
+- Stable when swiping between Spaces
+- Settings: toggles for media reactions, break reminders and system comments
+
 ## 0.1.0
 
 First release.
