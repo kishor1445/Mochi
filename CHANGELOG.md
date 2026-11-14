@@ -10,6 +10,7 @@
 - Focus sessions (15 / 25 / 50 minutes): the pet keeps quiet, then celebrates with you
 - Launch at login (from the built Mochi.app)
 - The menu and the settings panel show how the pet is feeling
+- Every pet redrawn to be cuter: chubbier bodies with soft shading, bigger sparkly eyes, rosier cheeks, tiny mouths with tongues, paws in front, plus a bow for Clover, a feather tuft and heart-shaped face for Pip, and a cream-tipped tail for Miso
 
 ## 0.3.0
 

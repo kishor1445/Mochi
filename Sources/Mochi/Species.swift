@@ -93,10 +93,10 @@ enum Species: String, CaseIterable, Identifiable {
     /// Pixels the ears / sprout / headphones stick out above the body (used to place the speech bubble).
     var headRoom: CGFloat {
         switch self {
-        case .mochi: return 14
+        case .mochi: return 22
         case .cat: return 18
         case .bunny: return 38
-        case .penguin: return 10
+        case .penguin: return 14
         case .ghost: return 10
         }
     }
@@ -108,6 +108,17 @@ enum Species: String, CaseIterable, Identifiable {
         case .bunny: return NSColor(calibratedRed: 0.98, green: 0.96, blue: 0.99, alpha: 1)
         case .penguin: return NSColor(calibratedRed: 0.24, green: 0.31, blue: 0.48, alpha: 1)
         case .ghost: return NSColor(calibratedRed: 0.96, green: 0.96, blue: 1.00, alpha: 1)
+        }
+    }
+
+    /// Soft tint along the bottom of the body.
+    var shade: NSColor {
+        switch self {
+        case .mochi: return NSColor(calibratedRed: 1.00, green: 0.80, blue: 0.82, alpha: 0.75)
+        case .cat: return NSColor(calibratedRed: 0.96, green: 0.58, blue: 0.30, alpha: 0.55)
+        case .bunny: return NSColor(calibratedRed: 0.88, green: 0.82, blue: 0.96, alpha: 0.8)
+        case .penguin: return NSColor(calibratedRed: 0.14, green: 0.19, blue: 0.36, alpha: 0.45)
+        case .ghost: return NSColor(calibratedRed: 0.84, green: 0.84, blue: 1.00, alpha: 0.85)
         }
     }
 

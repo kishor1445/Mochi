@@ -8,7 +8,7 @@ click, drag or ignore it.
 ![Swift](https://img.shields.io/badge/swift-5.9%2B-orange)
 ![License](https://img.shields.io/badge/license-MIT-blue)
 
-![The three pets in different moods](docs/pets.png)
+![The pets in different moods](docs/pets.png)
 
 Each pet has a little mind of its own: it gets tired, hungry and lonely, has its own personality, and
 grows closer to you the more you look after it. There is no AI model involved. Everything is rule-based
@@ -21,8 +21,8 @@ and runs offline, but the pet's decisions go through a single `Brain` interface,
 | --- | --- |
 | **Mochi** 🍡 | Squishy and sleepy blob with a leaf sprout. Naps a lot and loves company |
 | **Miso** 🐱 | Curious, sneaky cat with a wagging tail and whiskers. Explores and climbs, not very clingy |
-| **Clover** 🐰 | Bouncy bunny whose ears flop when it sleeps. The most playful of the lot |
-| **Pip** 🐧 | Waddly, dapper penguin in a red scarf who flaps when happy. Always hungry |
+| **Clover** 🐰 | Bouncy bunny with a pink bow whose ears flop when it sleeps. The most playful of the lot |
+| **Pip** 🐧 | Waddly, dapper penguin with a feather tuft and a red scarf who flaps when happy. Always hungry |
 | **Boo** 👻 | Floaty, friendly ghost with a wavy hem. Barely sleeps or eats |
 
 Switch pets any time from the settings panel:
