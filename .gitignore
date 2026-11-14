@@ -1,3 +1,7 @@
 .build/
 .swiftpm/
 .DS_Store
+dist/
+*.xcodeproj
+xcuserdata/
+preview.png
