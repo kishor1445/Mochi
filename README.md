@@ -1,6 +1,6 @@
 # Mochi 🍡
 
-A tiny desktop pet for macOS. Pick a pet and it lives on your screen: it wanders along the Dock,
+A tiny desktop pet for macOS. Pick one of five pets and it lives on your screen: it wanders along the Dock,
 climbs the screen edges, hangs from the top, stands on your windows, says hi, and reacts when you
 click, drag or ignore it.
 
@@ -18,6 +18,8 @@ interface, so a smarter (LLM-powered) brain can be plugged in later without touc
 | Pet | Personality |
 | --- | --- |
 | **Mochi** 🍡 | Squishy and sleepy blob with a leaf sprout |
+| **Miso** 🐱 | Curious, sneaky cat with a wagging tail and whiskers |
+| **Clover** 🐰 | Bouncy bunny whose ears flop when it sleeps |
 | **Pip** 🐧 | Waddly, dapper penguin in a red scarf who flaps when happy |
 | **Boo** 👻 | Floaty, friendly ghost with a wavy hem |
 
@@ -35,7 +37,7 @@ Switch pets any time from the settings panel:
 - Stays stable when you swipe between Spaces and shows up over full-screen apps
 
 **Reacts to what is happening on your Mac** (no special permissions)
-- **Music** (Music, Spotify, ...): puts on headphones, bobs to the beat and dances
+- **Music** (Spotify, Apple Music, ...): puts on headphones, bobs to the beat and dances, but only while music is actually playing (a paused Spotify doesn't count; it learns the state at the next play, pause or track change)
 - **Videos** (QuickTime, VLC, IINA, ...): settles down to watch ("Movie time! 🍿")
 - **Calls** (Zoom, Teams, FaceTime, Discord, ...): goes quiet and still
 - **Anything else making sound** (browsers, etc.): bobs along and sometimes dances
@@ -75,7 +77,7 @@ open dist/Mochi.app
 ```
 
 The build is ad-hoc signed, so on first launch macOS may ask you to right-click the app and choose
-**Open**. Mochi lives in the menu bar (🍡 / 🐧 / 👻); there is no Dock icon.
+**Open**. Mochi lives in the menu bar (the icon matches your pet); there is no Dock icon.
 
 ## Controls
 

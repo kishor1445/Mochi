@@ -143,8 +143,14 @@ final class PetView: NSView {
         // Ghosts float.
         let hover: CGFloat = sp == .ghost ? (mood == .sleep ? 1 : 7 + sin(t * 3) * 2.5) : 0
 
-        let baseW: CGFloat = sp == .mochi ? 74 : (sp == .penguin ? 64 : 66)
-        let baseH: CGFloat = sp == .mochi ? 56 : (sp == .penguin ? 68 : 66)
+        let baseW: CGFloat, baseH: CGFloat
+        switch sp {
+        case .mochi: baseW = 74; baseH = 56
+        case .cat: baseW = 72; baseH = 52
+        case .bunny: baseW = 62; baseH = 54
+        case .penguin: baseW = 64; baseH = 68
+        case .ghost: baseW = 66; baseH = 66
+        }
         let h = baseH * squash
         let w = baseW * (2 - squash)
         let body = NSRect(x: bounds.midX - w / 2, y: 8 + lift + hover, width: w, height: h)
@@ -157,6 +163,8 @@ final class PetView: NSView {
         // Behind the body
         switch sp {
         case .mochi: drawSprout(ctx, body)
+        case .cat: drawCatTail(body); drawCatEars(body)
+        case .bunny: drawBunnyTail(body); drawBunnyEars(ctx, body)
         case .penguin: drawFlippers(ctx, body)
         case .ghost: drawGhostArms(ctx, body)
         }
@@ -167,6 +175,10 @@ final class PetView: NSView {
         sp.fur.setFill()
         path.fill()
         if sp == .penguin { drawPenguinMarkings(body) }
+        if sp == .cat {
+            NSColor(calibratedRed: 1, green: 0.92, blue: 0.8, alpha: 1).setFill()
+            NSBezierPath(ovalIn: NSRect(x: body.midX - 15, y: body.minY + 3, width: 30, height: h * 0.38)).fill()
+        }
         sp.outline.setStroke()
         path.lineWidth = 2.5
         path.stroke()
@@ -180,7 +192,7 @@ final class PetView: NSView {
 
     private func bodyPath(_ body: NSRect) -> NSBezierPath {
         switch species {
-        case .mochi:
+        case .mochi, .cat, .bunny:
             return NSBezierPath(roundedRect: body, xRadius: body.width * 0.45, yRadius: body.height * 0.5)
         case .penguin:
             return NSBezierPath(roundedRect: body, xRadius: body.width * 0.5, yRadius: body.height * 0.46)
@@ -236,6 +248,76 @@ final class PetView: NSView {
             ctx.restoreGState()
         }
         ctx.restoreGState()
+    }
+
+    private func drawCatTail(_ body: NSRect) {
+        let dir = -facing
+        let base = NSPoint(x: body.midX + dir * (body.width / 2 - 8), y: body.minY + body.height * 0.3)
+        let active = mood == .walk || mood == .chase
+        let wag = sin(time * (active ? 9 : 3)) * 9
+        let p = NSBezierPath()
+        p.move(to: base)
+        p.curve(to: NSPoint(x: base.x + dir * 20 + wag, y: base.y + 30),
+                controlPoint1: NSPoint(x: base.x + dir * 24, y: base.y + 2),
+                controlPoint2: NSPoint(x: base.x + dir * 28 + wag, y: base.y + 16))
+        p.lineCapStyle = .round
+        p.lineWidth = 9; species.outline.setStroke(); p.stroke()
+        p.lineWidth = 5; species.fur.setStroke(); p.stroke()
+    }
+
+    private func drawCatEars(_ body: NSRect) {
+        let a = body.width / 2, b = body.height / 2
+        func pt(_ u: CGFloat) -> NSPoint {
+            NSPoint(x: body.midX + u * a, y: body.midY + b * sqrt(max(0, 1 - u * u)) - 3)
+        }
+        for side in [CGFloat(-1), 1] {
+            let p1 = pt(side * 0.88), p2 = pt(side * 0.32)
+            let apex = NSPoint(x: body.midX + side * a * 0.7, y: body.maxY + 15)
+            let tri = NSBezierPath()
+            tri.move(to: p1); tri.line(to: apex); tri.line(to: p2); tri.close()
+            tri.lineJoinStyle = .round
+            species.fur.setFill(); tri.fill()
+            species.outline.setStroke(); tri.lineWidth = 2.5; tri.stroke()
+
+            let cx = (p1.x + p2.x + apex.x) / 3, cy = (p1.y + p2.y + apex.y) / 3
+            func shrink(_ p: NSPoint) -> NSPoint { NSPoint(x: cx + (p.x - cx) * 0.5, y: cy + (p.y - cy) * 0.5) }
+            let inner = NSBezierPath()
+            inner.move(to: shrink(p1)); inner.line(to: shrink(apex)); inner.line(to: shrink(p2)); inner.close()
+            species.accent.setFill(); inner.fill()
+        }
+    }
+
+    private func drawBunnyTail(_ body: NSRect) {
+        let dir = -facing
+        let r = NSRect(x: body.midX + dir * (body.width / 2 - 2) - 7, y: body.minY + 4, width: 14, height: 14)
+        let p = NSBezierPath(ovalIn: r)
+        species.fur.setFill(); p.fill()
+        species.outline.setStroke(); p.lineWidth = 2; p.stroke()
+    }
+
+    private func drawBunnyEars(_ ctx: CGContext, _ body: NSRect) {
+        for u in [CGFloat(-0.42), 0.42] {
+            let outward: CGFloat = u < 0 ? 1 : -1       // CCW is positive rotation: left ear leans left
+            var rot = outward * 0.12
+            switch mood {
+            case .walk, .chase: rot += facing * 0.3 + sin(time * 10 + u) * 0.08
+            case .sleep:        rot = outward * 1.15
+            case .happy, .dance: rot += sin(time * 9) * 0.12
+            case .held:         rot += outward * 0.4
+            case .dizzy:        rot += sin(time * 12 + u) * 0.25
+            default:            rot += sin(time * 1.5 + u * 3) * 0.03
+            }
+            let base = NSPoint(x: body.midX + u * body.width / 2, y: body.maxY - 5)
+            ctx.saveGState()
+            ctx.translateBy(x: base.x, y: base.y)
+            ctx.rotate(by: rot)
+            let ear = NSBezierPath(ovalIn: NSRect(x: -7, y: 0, width: 14, height: 38))
+            species.fur.setFill(); ear.fill()
+            species.outline.setStroke(); ear.lineWidth = 2.5; ear.stroke()
+            species.accent.setFill()
+            NSBezierPath(ovalIn: NSRect(x: -3.5, y: 6, width: 7, height: 24)).fill()
+            ctx.restoreGState()
+        }
     }
 
     /// A limb that hangs from `pivot` and swings by `ang` (positive = counter-clockwise).
@@ -313,8 +395,8 @@ final class PetView: NSView {
     private func drawFace(_ body: NSRect) {
         let sp = species
         let ink = sp.ink
-        let eyeY = body.minY + body.height * (sp == .mochi ? 0.55 : 0.58)
-        let spread: CGFloat = sp == .mochi ? 11 : (sp == .penguin ? 9.5 : 10)
+        let eyeY = body.minY + body.height * (sp == .penguin || sp == .ghost ? 0.58 : 0.55)
+        let spread: CGFloat = sp == .mochi ? 11 : (sp == .cat ? 10.5 : (sp == .bunny ? 9.5 : (sp == .penguin ? 9.5 : 10)))
         let fx = body.midX + facing * (sp == .mochi ? 7 : 5)
         let blinking = fmod(time + 1.3, 4.3) < 0.12
 
@@ -359,6 +441,46 @@ final class PetView: NSView {
                 NSBezierPath(ovalIn: NSRect(x: fx - 3, y: eyeY - 17, width: 6, height: 7)).fill()
             } else {
                 arc(NSPoint(x: fx, y: eyeY - 9), 3, 200, 340)
+            }
+        case .cat:
+            NSColor(calibratedRed: 1, green: 0.55, blue: 0.6, alpha: 1).setFill()
+            let nose = NSBezierPath()
+            nose.move(to: NSPoint(x: fx - 2.8, y: eyeY - 6)); nose.line(to: NSPoint(x: fx + 2.8, y: eyeY - 6))
+            nose.line(to: NSPoint(x: fx, y: eyeY - 9.5)); nose.close(); nose.fill()
+            ink.setStroke(); ink.setFill()
+            arc(NSPoint(x: fx - 2.6, y: eyeY - 11), 2.6, 200, 340)
+            arc(NSPoint(x: fx + 2.6, y: eyeY - 11), 2.6, 200, 340)
+            if open { NSBezierPath(ovalIn: NSRect(x: fx - 3, y: eyeY - 18, width: 6, height: 6)).fill() }
+            // whiskers
+            NSColor(calibratedRed: 0.45, green: 0.3, blue: 0.2, alpha: 0.7).setStroke()
+            for side in [CGFloat(-1), 1] {
+                for k in 0..<3 {
+                    let p = NSBezierPath()
+                    p.move(to: NSPoint(x: fx + side * 15, y: eyeY - 8 + CGFloat(k - 1) * 3.5))
+                    p.line(to: NSPoint(x: fx + side * 27, y: eyeY - 8 + CGFloat(k - 1) * 6.5))
+                    p.lineWidth = 1.2; p.lineCapStyle = .round; p.stroke()
+                }
+            }
+            // forehead stripes
+            NSColor(calibratedRed: 0.85, green: 0.5, blue: 0.2, alpha: 0.9).setStroke()
+            for (i, dx) in [CGFloat(-5), 0, 5].enumerated() {
+                let p = NSBezierPath()
+                p.move(to: NSPoint(x: fx + dx, y: body.maxY - 3))
+                p.line(to: NSPoint(x: fx + dx, y: body.maxY - (i == 1 ? 11 : 8)))
+                p.lineWidth = 2; p.lineCapStyle = .round; p.stroke()
+            }
+        case .bunny:
+            sp.accent.setFill()
+            NSBezierPath(ovalIn: NSRect(x: fx - 2.6, y: eyeY - 9, width: 5.2, height: 4)).fill()
+            ink.setStroke(); ink.setFill()
+            arc(NSPoint(x: fx - 2.4, y: eyeY - 11), 2.4, 200, 340)
+            arc(NSPoint(x: fx + 2.4, y: eyeY - 11), 2.4, 200, 340)
+            // little teeth
+            NSColor.white.setFill()
+            for dx in [CGFloat(-2.4), 0.2] {
+                let tooth = NSBezierPath(roundedRect: NSRect(x: fx + dx, y: eyeY - 17, width: 2.4, height: 4), xRadius: 0.8, yRadius: 0.8)
+                tooth.fill()
+                ink.setStroke(); tooth.lineWidth = 0.8; tooth.stroke()
             }
         case .penguin:
             if open {

@@ -3,7 +3,7 @@
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
-VERSION="${VERSION:-0.1.0}"
+VERSION="${VERSION:-0.3.0}"
 APP="dist/Mochi.app"
 
 swift build -c release

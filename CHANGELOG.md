@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.0
+
+- Miso the cat and Clover the bunny are back, so there are five pets to choose from
+- Spotify and Apple Music only trigger dancing while a track is actually playing (an open but paused app no longer counts)
+- Settings: pet picker is now a grid
+
 ## 0.2.0
 
 - New pets: Pip the penguin and Boo the ghost (replacing the cat and bunny)

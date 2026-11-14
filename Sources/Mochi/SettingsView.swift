@@ -50,7 +50,7 @@ struct SettingsView: View {
         VStack(alignment: .leading, spacing: 18) {
             Text("Choose your pet").font(.title3.weight(.semibold))
 
-            HStack(spacing: 12) {
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 12), count: 3), spacing: 12) {
                 ForEach(Species.allCases) { sp in
                     PetCard(species: sp, selected: settings.species == sp)
                         .onTapGesture { settings.species = sp }

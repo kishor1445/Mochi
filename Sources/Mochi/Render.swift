@@ -5,7 +5,7 @@ enum Render {
     static func run(to path: String) {
         let moods: [Mood] = [.idle, .walk, .happy, .sleep, .held, .dance, .stretch, .dizzy]
         let cell = PetView.side
-        let sheet = NSImage(size: NSSize(width: cell * CGFloat(moods.count), height: cell * CGFloat(Species.allCases.count) + cell))
+        let sheet = NSImage(size: NSSize(width: cell * CGFloat(moods.count), height: cell * CGFloat(Species.allCases.count + 2)))
         sheet.lockFocus()
         NSColor(calibratedWhite: 0.93, alpha: 1).setFill()
         NSRect(origin: .zero, size: sheet.size).fill()
@@ -28,7 +28,7 @@ enum Render {
             let rep = v.bitmapImageRepForCachingDisplay(in: v.bounds)!
             v.cacheDisplay(in: v.bounds, to: rep)
             let img = NSImage(size: v.bounds.size); img.addRepresentation(rep)
-            img.draw(at: NSPoint(x: CGFloat(col) * cell, y: 0), from: .zero, operation: .sourceOver, fraction: 1)
+            img.draw(at: NSPoint(x: CGFloat(col) * cell, y: cell), from: .zero, operation: .sourceOver, fraction: 1)
         }
         for (i, sp) in Species.allCases.enumerated() {
             let v = PetView(frame: NSRect(origin: .zero, size: PetView.size))
@@ -36,7 +36,7 @@ enum Render {
             let rep = v.bitmapImageRepForCachingDisplay(in: v.bounds)!
             v.cacheDisplay(in: v.bounds, to: rep)
             let img = NSImage(size: v.bounds.size); img.addRepresentation(rep)
-            img.draw(at: NSPoint(x: CGFloat(4 + i) * cell, y: 0), from: .zero, operation: .sourceOver, fraction: 1)
+            img.draw(at: NSPoint(x: CGFloat(i) * cell, y: 0), from: .zero, operation: .sourceOver, fraction: 1)
         }
         sheet.unlockFocus()
         if let tiff = sheet.tiffRepresentation, let rep = NSBitmapImageRep(data: tiff),

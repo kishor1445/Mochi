@@ -18,10 +18,28 @@ final class AudioWatcher {
     private var streak = 0
     private var timer: Timer?
 
+    /// Real play/pause state for apps that keep their audio stream open while paused (Spotify, Music).
+    /// They announce changes system-wide, which needs no permission.
+    private var playing: [String: Bool] = [:]
+
     func start() {
+        let center = DistributedNotificationCenter.default()
+        center.addObserver(forName: Notification.Name("com.spotify.client.PlaybackStateChanged"),
+                           object: nil, queue: .main) { [weak self] n in self?.record("spotify", n) }
+        for name in ["com.apple.Music.playerInfo", "com.apple.iTunes.playerInfo"] {
+            center.addObserver(forName: Notification.Name(name), object: nil, queue: .main) { [weak self] n in
+                self?.record("music", n)
+            }
+        }
+
         let t = Timer(timeInterval: 1, repeats: true) { [weak self] _ in self?.poll() }
         RunLoop.main.add(t, forMode: .common)
         timer = t
+    }
+
+    private func record(_ app: String, _ note: Notification) {
+        let state = (note.userInfo?["Player State"] as? String)?.lowercased()
+        playing[app] = (state == "playing")
     }
 
     /// Require a sound to last a couple of seconds so notification dings don't count.
@@ -59,10 +77,16 @@ final class AudioWatcher {
                 "com.apple.siri", "com.apple.notificationcenter", "com.apple.speech", "com.apple.voiceover",
                 "com.apple.controlcenter", "mochi"]) { return nil }
 
+        // Spotify and Apple Music hold their audio stream open even when paused, so only count them
+        // while they say they are actually playing. (Before the first play/pause/track change since
+        // Mochi started, their state is unknown and they are ignored.)
+        if has(["spotify"]) { return playing["spotify"] == true ? .music : nil }
+        if has(["com.apple.music", "com.apple.itunes"]) { return playing["music"] == true ? .music : nil }
+
         if has(["us.zoom", "com.microsoft.teams", "com.apple.facetime", "slack", "skype", "webex", "discord",
                 "com.apple.ichat", "whatsapp", "com.hnc"]) { return .call }
-        if has(["com.apple.music", "spotify", "com.apple.itunes", "tidal", "amazon.music", "com.apple.podcasts",
-                "garageband", "ableton", "deezer", "soundcloud", "pandora", "vox", "swinsian"]) { return .music }
+        if has(["tidal", "amazon.music", "garageband", "ableton", "deezer", "soundcloud", "pandora", "vox",
+                "swinsian"]) { return .music }
         if has(["quicktime", "videolan", "iina", "com.apple.tv", "plex", "mpv", "netflix", "infuse", "disney"]) { return .video }
         return .other           // browsers and anything else that makes sound
     }
