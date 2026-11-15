@@ -33,6 +33,7 @@ extension PetView {
             lift += tap * 3.5
             squash -= tap * 0.045
         }
+        squash -= impact * 0.16
         lift += hop
         // Ghosts float.
         let hover: CGFloat = sp == .ghost ? (mood == .sleep ? 1 : 7 + sin(t * 3) * 2.5) : 0

@@ -23,9 +23,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         statusItem.menu = makeMenu()
         pet.setContextMenu(makeMenu())              // right-click on the pet
 
-        PetSettings.shared.$species.receive(on: DispatchQueue.main).sink { [weak self] s in
-            self?.statusItem.button?.title = s.emoji
-        }.store(in: &cancellables)
+        // A plain template glyph, so it follows the menu bar's light and dark appearance like every other icon.
+        let glyph = NSImage(systemSymbolName: "pawprint.fill", accessibilityDescription: "Mochi")
+        glyph?.isTemplate = true
+        statusItem.button?.image = glyph
 
         // Second pet: comes and goes with the setting.
         PetSettings.shared.$secondPet.receive(on: DispatchQueue.main).sink { [weak self] on in

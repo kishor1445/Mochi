@@ -10,9 +10,7 @@ struct MenuHeader: View {
             HStack(alignment: .firstTextBaseline) {
                 Text(species.name).font(.system(size: 13, weight: .semibold))
                 Spacer()
-                Text("\(mind.feeling.label) \(mind.feeling.emoji)")
-                    .font(.system(size: 12))
-                    .foregroundStyle(.secondary)
+                FeelingPill(feeling: mind.feeling)
             }
             HStack(spacing: 12) {
                 Meter(symbol: "bolt.fill", label: "Energy", value: mind.energy, tint: .orange, showLabel: false)

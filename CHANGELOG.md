@@ -6,6 +6,10 @@
 - Two new tough pets: Fang the wolf and Chomp the shark, each with its own personality, lines, snack, toy and power move
 - Rex, Bolt and Ember are redrawn in the tough style: Rex has a toothy jaw, Bolt is a battle mech with a visor and chest reactor, Ember has spread wings and slit eyes
 - The pet picker shows the five cute pets on the first row and the five tough ones on the second
+- Settings redesigned: a sidebar of pages, a pet card with its mood, needs and actions, and grouped rows with coloured icons
+- No more emoji in the menu bar or settings: the menu bar shows a paw glyph and moods use symbols (speech bubbles, treats and toys keep theirs)
+- Smoother movement: pets ease in and out of a walk, rock and lean as they go, turn their head round instead of flipping, and squash when they land
+- Fixed: spins, backflips and zoomies could start while hanging from the top of the screen or a wall, and an interrupted trick could leave the pet tilted
 
 ## 0.5.0
 

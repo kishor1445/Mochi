@@ -29,6 +29,7 @@ final class PetView: NSView {
     var shiver = false                   // the battery is nearly empty
     var hop: CGFloat = 0                 // extra height off the ground (backflips)
     var tap: CGFloat = 0                 // 1 right after a key press, fades fast: a little bop while you type
+    var impact: CGFloat = 0              // 1 right after landing, fades fast: a squash on touchdown
     var isPreview = false                // settings-panel mini version
 
     var onClick: (() -> Void)?
@@ -48,6 +49,7 @@ final class PetView: NSView {
     func advance(_ dt: CGFloat) {
         time += dt
         tap = max(0, tap - dt * 7)
+        impact = max(0, impact - dt * 5)
         for i in hearts.indices {
             hearts[i].age += dt
             if hearts[i].age > 0 { hearts[i].y += 36 * dt }
@@ -117,7 +119,12 @@ final class PetView: NSView {
         }
         var sway: CGFloat = 0
         if mood == .dance { sway = sin(time * 8) * 0.14 }
-        else if species == .penguin && (mood == .walk || mood == .chase) { sway = sin(time * 10) * 0.12 }
+        else if mood == .walk || mood == .chase {
+            // Rock from foot to foot and lean into the walk; tough pets stomp, the penguin waddles.
+            let rock: CGFloat = species == .penguin ? 0.12 : (species.style == .tough ? 0.06 : 0.035)
+            let lean: CGFloat = mood == .chase ? 0.10 : 0.04
+            sway = sin(time * (mood == .chase ? 14 : 10)) * rock - facing * lean
+        }
         if sway != 0 {
             ctx.translateBy(x: Self.canvas.midX, y: 8)
             ctx.rotate(by: sway)

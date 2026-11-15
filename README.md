@@ -178,7 +178,7 @@ Sources/Mochi
 ├── UI/
 │   ├── SpeechBubble.swift         the speech bubble window
 │   ├── Menu/MenuHeader.swift      status card at the top of the menu
-│   ├── Components/                PetPreview, PetCard, StatusCard, Meter, StatTile
+│   ├── Components/                PetPreview, PetCard, SettingsKit (cards, rows, pills), Meter, StatTile
 │   └── Settings/
 │       ├── PetSettings.swift      saved preferences (UserDefaults)
 │       ├── SettingsView.swift     the tabbed settings panel

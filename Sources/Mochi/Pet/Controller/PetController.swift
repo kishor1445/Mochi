@@ -48,6 +48,7 @@ final class PetController {
     var vy: CGFloat = 0
     var surface: Surface = .floor
     var facing: CGFloat = 1
+    var gait: CGFloat = 0                   // 0…1: eases the pet in and out of a walk, and through turns
     var targetAngle: CGFloat = 0
     var held = false
     var vx: CGFloat = 0                     // sideways speed while thrown

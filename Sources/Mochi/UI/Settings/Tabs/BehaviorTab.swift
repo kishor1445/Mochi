@@ -4,24 +4,28 @@ struct BehaviorTab: View {
     @ObservedObject var settings: PetSettings
 
     var body: some View {
-        Form {
-            Section("Moving around") {
-                Toggle("Walk and leap onto windows", isOn: $settings.walkOnWindows)
-                Toggle("Climb screen edges and hang from the top", isOn: $settings.climbEdges)
-                Toggle("Chase my cursor sometimes", isOn: $settings.followCursor)
+        VStack(alignment: .leading, spacing: 18) {
+            CardSection(title: "Moving around") {
+                ToggleRow(symbol: "macwindow", tint: .green, title: "Walk and leap onto windows",
+                          subtitle: "Stands on window tops and follows them around", isOn: $settings.walkOnWindows)
+                RowDivider()
+                ToggleRow(symbol: "arrow.up.to.line", tint: .teal, title: "Climb screen edges",
+                          subtitle: "Walks up the sides and hangs from the top", isOn: $settings.climbEdges)
+                RowDivider()
+                ToggleRow(symbol: "cursorarrow.rays", tint: .blue, title: "Chase my cursor sometimes",
+                          isOn: $settings.followCursor)
             }
-            Section {
-                Toggle("React to music, videos and calls", isOn: $settings.reactToMedia)
-                Toggle("Bop along while I type", isOn: $settings.reactToTyping)
-                Toggle("Comment on battery, time of day and a busy Mac", isOn: $settings.systemAware)
-            } header: {
-                Text("Paying attention")
-            } footer: {
-                Text("Typing is only counted, never read. Nothing leaves your Mac.")
-                    .font(.caption).foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+            CardSection(title: "Paying attention",
+                        footer: "Typing is only counted, never read. Nothing leaves your Mac.") {
+                ToggleRow(symbol: "music.note", tint: .pink, title: "React to music, videos and calls",
+                          subtitle: "Dances to music, settles for videos, goes quiet on calls", isOn: $settings.reactToMedia)
+                RowDivider()
+                ToggleRow(symbol: "keyboard", tint: .indigo, title: "Bop along while I type",
+                          isOn: $settings.reactToTyping)
+                RowDivider()
+                ToggleRow(symbol: "bolt.fill", tint: .orange, title: "Comment on my Mac",
+                          subtitle: "Battery, time of day and a busy processor", isOn: $settings.systemAware)
             }
         }
-        .formStyle(.grouped)
     }
 }

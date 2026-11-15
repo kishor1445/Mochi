@@ -7,14 +7,17 @@ struct StatTile: View {
     let tint: Color
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Image(systemName: symbol).font(.system(size: 15)).foregroundStyle(tint).frame(height: 18)
-            Text(value).font(.system(size: 20, weight: .semibold, design: .rounded))
-            Text(label).font(.caption).foregroundStyle(.secondary)
+        VStack(alignment: .leading, spacing: 8) {
+            IconBadge(symbol: symbol, tint: tint)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(value).font(.system(size: 22, weight: .semibold, design: .rounded))
+                Text(label).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            }
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(maxWidth: .infinity, minHeight: 92, alignment: .topLeading)
         .padding(12)
-        .background(RoundedRectangle(cornerRadius: 12).fill(Color.primary.opacity(0.04)))
+        .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Color(nsColor: .controlBackgroundColor)))
+        .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).stroke(Color.primary.opacity(0.08), lineWidth: 1))
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("\(label): \(value)")
     }

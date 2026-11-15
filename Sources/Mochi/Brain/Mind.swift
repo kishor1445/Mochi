@@ -24,13 +24,14 @@ enum Feeling {
         }
     }
 
-    var emoji: String {
+    /// SF Symbol shown next to the feeling in the menu and settings.
+    var symbol: String {
         switch self {
-        case .sleepy: return "😴"
-        case .hungry: return "🍽"
-        case .lonely: return "🥺"
-        case .joyful: return "🥰"
-        case .content: return "🙂"
+        case .sleepy: return "moon.zzz.fill"
+        case .hungry: return "fork.knife"
+        case .lonely: return "cloud.rain.fill"
+        case .joyful: return "sparkles"
+        case .content: return "leaf.fill"
         }
     }
 }

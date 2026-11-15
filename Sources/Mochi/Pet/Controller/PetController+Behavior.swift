@@ -41,7 +41,7 @@ extension PetController {
             if forceSay || Double.random(in: 0..<1) < 0.6 {
                 say(Dialogue.power(species).randomElement() ?? "Ta-daa!", force: forceSay)
             }
-        case .flip:
+        case .flip, .spin:
             flipLength = max(0.3, d.duration)
         case .greet:
             say(greetingLine(), force: forceSay)
@@ -53,6 +53,16 @@ extension PetController {
             if Double.random(in: 0..<1) < 0.5 { say("Zoomies!!") }
         default:
             break
+        }
+        // Acrobatics need the ground: hanging from the top of the screen or a wall, it just looks pleased instead.
+        if surface != .floor {
+            switch action {
+            case .spin, .flip, .zoomies:
+                action = .happy
+                remaining = min(remaining, 1.5)
+            default:
+                break
+            }
         }
         view.spin = 0
     }
@@ -85,7 +95,9 @@ extension PetController {
     }
 
     func behave(_ dt: CGFloat, _ f: NSRect) {
-        if action != .flip { view.hop = 0 }
+        // Spin and hop are worked out fresh every frame, so an interrupted trick can never leave the pet tilted.
+        var spin: CGFloat = 0
+        var hop: CGFloat = 0
         switch action {
         case .idle, .leap, .climbEdge:
             view.mood = .idle
@@ -104,22 +116,24 @@ extension PetController {
         case .dance:
             view.mood = .dance
         case .spin:
+            // one full twirl, easing in and out
+            let t = CGFloat(min(1, max(0, 1 - remaining / flipLength)))
             view.mood = .happy
-            view.spin += 2 * .pi * dt / 0.9
+            spin = 2 * .pi * t * t * (3 - 2 * t)
         case .dizzy:
             view.mood = .dizzy
-            view.spin = sin(view.time * 10) * 0.1
+            spin = sin(view.time * 10) * 0.1
         case .mope:
             view.mood = .sad
         case .power:
             view.mood = .power
-            if species == .dino { view.spin = sin(view.time * 44) * 0.045 }      // shaking with the roar
+            if species == .dino || species == .wolf { spin = sin(view.time * 44) * 0.045 }   // shaking with the roar
         case .flip:
             // up, all the way round, and back down on its feet
             let t = CGFloat(min(1, max(0, 1 - remaining / flipLength)))
             view.mood = .jump
-            view.spin = -facing * 2 * .pi * t
-            view.hop = sin(t * .pi) * 34
+            spin = -facing * 2 * .pi * t
+            hop = sin(t * .pi) * 34
         case .hide:
             hideAndPeek(dt, f)
         case .visit:
@@ -132,6 +146,8 @@ extension PetController {
             if Double.random(in: 0..<1) < 0.03 { turnAround() }
             advance(species.walkSpeed * 3.5 * dt, autonomous: true, f)
         }
+        view.spin = spin
+        view.hop = hop
         snap(f)
     }
 

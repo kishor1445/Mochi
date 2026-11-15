@@ -39,7 +39,8 @@ extension PetController {
         switch action {
         case .idle, .lookAround, .mope, .leap, .climbEdge:
             // Just standing there: breathing and blinking look fine at half speed.
-            return view.musicBpm > 0 || view.tap > 0 || slipTimer > 0 || abs(hideShift) > 0.5 ? 30 : 15
+            return view.musicBpm > 0 || view.tap > 0 || view.impact > 0 || view.facing != facing || slipTimer > 0
+                || abs(hideShift) > 0.5 ? 30 : 15
         case .hide where hidePhase == .hidden:
             return 15
         default:

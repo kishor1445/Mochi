@@ -5,34 +5,40 @@ struct GeneralTab: View {
     var onBringBack: () -> Void
 
     var body: some View {
-        Form {
-            Section("Appearance") {
-                Picker("Size", selection: $settings.petSize) {
-                    ForEach(PetSize.allCases) { Text($0.label).tag($0) }
+        VStack(alignment: .leading, spacing: 18) {
+            CardSection(title: "Appearance") {
+                SettingRow(symbol: "arrow.up.left.and.arrow.down.right", tint: .blue, title: "Size") {
+                    Picker("Size", selection: $settings.petSize) {
+                        ForEach(PetSize.allCases) { Text($0.label).tag($0) }
+                    }
+                    .pickerStyle(.segmented)
+                    .labelsHidden()
+                    .frame(width: 220)
                 }
-                .pickerStyle(.segmented)
-                Picker("Speech bubbles", selection: $settings.chattiness) {
-                    ForEach(Chattiness.allCases) { Text($0.label).tag($0) }
+                RowDivider()
+                SettingRow(symbol: "bubble.left.fill", tint: .green, title: "Speech bubbles") {
+                    Picker("Speech bubbles", selection: $settings.chattiness) {
+                        ForEach(Chattiness.allCases) { Text($0.label).tag($0) }
+                    }
+                    .pickerStyle(.segmented)
+                    .labelsHidden()
+                    .frame(width: 260)
                 }
-                .pickerStyle(.segmented)
             }
-            Section {
-                Toggle("Launch at login", isOn: Binding(get: { settings.launchAtLogin },
-                                                        set: { settings.launchAtLogin = LoginItem.set($0) }))
-                    .disabled(!LoginItem.available)
-                LabeledContent("Lost your pet?") {
-                    Button("Bring back to screen", action: onBringBack)
+            CardSection(title: "System") {
+                SettingRow(symbol: "power", tint: .gray, title: "Launch at login",
+                           subtitle: LoginItem.available ? nil : "Needs the built Mochi.app") {
+                    Toggle("Launch at login", isOn: Binding(get: { settings.launchAtLogin },
+                                                            set: { settings.launchAtLogin = LoginItem.set($0) }))
+                        .labelsHidden().toggleStyle(.switch).controlSize(.small)
+                        .disabled(!LoginItem.available)
                 }
-            } header: {
-                Text("System")
-            } footer: {
-                if !LoginItem.available {
-                    Text("Launch at login needs the built Mochi.app.")
-                        .font(.caption).foregroundStyle(.secondary)
-                        .frame(maxWidth: .infinity, alignment: .leading)
+                RowDivider()
+                SettingRow(symbol: "arrow.uturn.backward", tint: .orange, title: "Lost your pet?",
+                           subtitle: "Drops it back in from the top of the screen") {
+                    Button("Bring back", action: onBringBack)
                 }
             }
         }
-        .formStyle(.grouped)
     }
 }

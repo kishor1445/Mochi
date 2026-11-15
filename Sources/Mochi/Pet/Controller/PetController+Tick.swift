@@ -39,8 +39,11 @@ extension PetController {
             cx = px
             cy = py
             view.mood = .held
+            view.hop = 0
             targetAngle = 0
         } else if var j = jump {
+            view.spin = 0
+            view.hop = 0
             j.t += dt / j.duration
             if j.t >= 1 {
                 jump = nil
@@ -77,6 +80,10 @@ extension PetController {
                 if gripTime > 30, Double.random(in: 0..<1) < rate * Double(dt) { startSlip() }
             }
 
+            // Ease in and out of a walk instead of starting and stopping dead.
+            let moving = view.mood == .walk || view.mood == .chase
+            gait += ((moving ? 1 : 0.1) - gait) * min(1, dt * 7)
+
             if let t = treat, handleTreat(t, dt, f) {
                 finish(dt, f)
                 return
@@ -112,7 +119,9 @@ extension PetController {
         let strength = min(1, dist / 150) * 2.6
         view.gaze = CGPoint(x: (ux * cos(a) + uy * sin(a)) * strength,
                             y: (-ux * sin(a) + uy * cos(a)) * strength)
-        view.facing = facing
+        // Turn the head round over a few frames rather than flipping it.
+        view.facing += (facing - view.facing) * min(1, dt * 16)
+        if abs(facing - view.facing) < 0.02 { view.facing = facing }
 
         // Hide and peek: slide past the screen edge until only half the face shows.
         let hidden = action == .hide && hidePhase == .hidden

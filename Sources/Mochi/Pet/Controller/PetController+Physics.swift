@@ -13,7 +13,10 @@ extension PetController {
             if cx < f.minX + reach { cx = f.minX + reach; vx = abs(vx) * 0.6 }
             if cx > f.maxX - reach { cx = f.maxX - reach; vx = -abs(vx) * 0.6 }
             if cy > f.maxY - reach { cy = f.maxY - reach; vy = -abs(vy) * 0.5 }
+        } else {
+            view.spin = 0
         }
+        view.hop = 0
         let newFeet = cy - reach
         cx = clamp(cx, f.minX + reach, f.maxX - reach)
         view.mood = .held
@@ -52,7 +55,10 @@ extension PetController {
         }
         platform = p
         surface = .floor
+        view.impact = min(1, abs(vy) / 900)        // squash on landing, harder after a long drop
         vy = 0
+        view.spin = 0
+        gait = 0
         cx = clamp(cx, p.minX, p.maxX)
         cy = p.top + reach
         if slipped {

@@ -102,6 +102,7 @@ extension PetController {
     /// (turn around, climb the wall, hop off a window).
     func advance(_ distance: CGFloat, autonomous: Bool, _ f: NSRect) {
         let s = map(facing, surface)
+        let distance = distance * gait
         switch surface {
         case .floor, .ceiling: cx += s * distance
         case .leftWall, .rightWall: cy += s * distance
@@ -110,7 +111,8 @@ extension PetController {
         if autonomous { handleEnds(f, s) }
     }
 
-    func turnAround() { facing = -facing }
+    /// Slows right down through the turn, then picks the pace back up.
+    func turnAround() { facing = -facing; gait = min(gait, 0.15) }
 
     func handleEnds(_ f: NSRect, _ s: CGFloat) {
         let was = surface

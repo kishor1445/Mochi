@@ -64,16 +64,10 @@ extension Render {
     /// Writes each settings tab and the menu header next to `path` (…-behavior.png, …-general.png, …-menu.png).
     static func settings(to path: String) {
         let s = PetSettings.shared
-        let size = SettingsView.size
-        snapshot(PetTab(settings: s, onSayHi: {}, onTreat: {}, onPlay: {}).frame(width: size.width, height: size.height), to: path)
-        snapshot(BehaviorTab(settings: s).frame(width: size.width, height: size.height),
-                 to: path.replacingOccurrences(of: ".png", with: "-behavior.png"))
-        snapshot(GeneralTab(settings: s, onBringBack: {}).frame(width: size.width, height: size.height),
-                 to: path.replacingOccurrences(of: ".png", with: "-general.png"))
-        snapshot(RemindersTab(settings: s).frame(width: size.width, height: size.height),
-                 to: path.replacingOccurrences(of: ".png", with: "-reminders.png"))
-        snapshot(TodayTab(log: .shared).frame(width: size.width, height: size.height),
-                 to: path.replacingOccurrences(of: ".png", with: "-today.png"))
+        for page in SettingsPage.allCases {
+            let view = SettingsView(settings: s, onSayHi: {}, onBringBack: {}, onTreat: {}, onPlay: {}, nav: SettingsNav(page))
+            snapshot(view, to: page == .pet ? path : path.replacingOccurrences(of: ".png", with: "-\(page.rawValue).png"))
+        }
         snapshot(MenuHeader(mind: .shared, species: s.species), to: path.replacingOccurrences(of: ".png", with: "-menu.png"))
     }
 
