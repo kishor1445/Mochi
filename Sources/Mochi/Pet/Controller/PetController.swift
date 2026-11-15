@@ -48,6 +48,10 @@ final class PetController {
     var vy: CGFloat = 0
     var surface: Surface = .floor
     var facing: CGFloat = 1
+    var lastSaid = ""                       // the last thing it said, and how many things so far (Debug page, tests)
+    var saidCount = 0
+    var lastSpot = CGPoint.zero             // where the pet last was, and for how long it has stayed put
+    var stillFor: TimeInterval = 0
     var gait: CGFloat = 0                   // 0…1: eases the pet in and out of a walk, and through turns
     var targetAngle: CGFloat = 0
     var held = false
@@ -63,11 +67,19 @@ final class PetController {
     var hideShift: CGFloat = 0              // how far the window is slid past the edge
 
     // Two pets
-    var nextVisit = Date().addingTimeInterval(.random(in: 12...25))
+    var visitWait: TimeInterval = .random(in: 12...25)     // seconds until this pet next tries to meet the other
+    var meetings = 0
     var social = SocialPhase.none           // what this pet is doing with the other one right now
     var socialKind = SocialKind.greet
     var socialTimer: CGFloat = 0
     var forcedSocial: SocialKind?           // Debug page: the next get-together must be this one
+
+    // AI: a little conversation ordered while running over to the other pet
+    var banterToken = 0                     // bumped whenever a conversation is ordered, started or dropped
+    var banterLines: [String]?
+    var banterAsked = false                 // the words are still on their way
+    var banterArrived: Date?                // standing together, waiting for them
+    var lastDiaryCheck = Date.distantPast
 
     // Power
     var pauseReasons = Set<String>()
@@ -146,7 +158,7 @@ final class PetController {
 
     let chaseSpeed: CGFloat = 170
 
-    init(brain: Brain = MindBrain(), isMain: Bool = true) {
+    init(brain: Brain = LLMBrain(), isMain: Bool = true) {
         self.brain = brain
         self.isMain = isMain
 
@@ -218,6 +230,7 @@ final class PetController {
                 guard let self else { return }
                 self.view.spawnHearts(6)
                 self.say("We're \(PetMind.title(level).lowercased())s now! 💞", force: true)
+                if PetAI.shared.on(.memory) { PetMemory.shared.note("Your bond grew: you are now \(PetMind.title(level).lowercased())s") }
                 // A new level unlocks a new thing to wear: mention it once the first bubble has gone.
                 if let gift = Outfit.allCases.first(where: { $0.unlockLevel == level }) {
                     DispatchQueue.main.asyncAfter(deadline: .now() + 4) { [weak self] in
@@ -251,7 +264,8 @@ final class PetController {
             } else if self.mind.awaySeconds > 8 * 3600 {
                 self.mind.reunited()
                 self.view.spawnHearts(4)
-                self.say(Dialogue.missedYou.randomElement() ?? "I missed you!")
+                self.react("Your human just opened the app again after \(Int(self.mind.awaySeconds / 3600)) hours apart",
+                           fallback: Dialogue.missedYou.randomElement() ?? "I missed you!")
             } else {
                 self.say("Hi! I'm \(self.species.name)!")
             }

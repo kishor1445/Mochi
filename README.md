@@ -43,6 +43,22 @@ Switch pets any time from the Pet tab in settings:
 - **Memory**: it remembers all of this between launches, rests while the app is closed, and misses you when you've been gone
 - See how it's doing at the top of the menu and in the settings panel
 
+**Can think with a language model (optional)**
+
+Point Mochi at any server that speaks the OpenAI API (Ollama, LM Studio, llama.cpp, OpenRouter, OpenAI…) in
+**Settings › AI**. Everything below is optional, each part has its own switch, and the pet falls back to its
+built-in lines and behaviour whenever the server is off or slow.
+- **Fresh lines**: the model writes new things to say for every moment (being petted, falling off a wall, a treat landing), in your pet's own voice. They are written in the background and saved, so bubbles stay instant
+- **Remarks about what's going on**: music starting in Spotify, you coming back, lunch time, a low battery, a busy Mac
+- **Decides what to do**: every few minutes the model picks the pet's next move from what it can do right now; in between, the pet follows its instincts
+- **Two pets talk**: when they meet to say hello, they have a short conversation
+- **Ask your pet**: *Ask Mochi…* in the menu opens a text box. "Dance", "25 minute focus", "remind me to drink water every 30 minutes", "put on the cap", "remember that I like lo-fi", or just a question
+- **Memory and diary**: it keeps a few facts about you and writes a short diary entry for each day, which you can read in Settings › AI
+
+With a local server nothing leaves your Mac. With a hosted one, short prompts are sent to it: the pet's mood, the
+time, the name of the app playing sound, your daily counts, what it remembers and what you type in Ask. Never your
+keystrokes, your screen or your calendar.
+
 **Plays with you (and with a friend)**
 - **Throw and bounce**: let go of the pet mid-swing and it flies, tumbles, bounces off the screen edges and lands dizzy
 - **Second pet**: turn on a companion in settings and the two meet up to say hello, play tag, dance, follow each other, show off or nap side by side
@@ -62,6 +78,7 @@ Switch pets any time from the Pet tab in settings:
 - Stands on top of your windows (and follows them), leaps up onto windows and hops off their edges
 - Drag and drop: let go near a screen edge and it clings there; let go mid-screen and it falls onto a window or the Dock
 - Stays stable when you swipe between Spaces and shows up over full-screen apps
+- **Several displays**: hops across to the next display, follows your cursor there, and can be dragged anywhere
 
 **Reacts to what is happening on your Mac** (no special permissions)
 - **Music** (Spotify, Apple Music, ...): puts on headphones, bobs to the beat and dances, but only while music is actually playing (a paused Spotify doesn't count; it learns the state at the next play, pause or track change)
@@ -148,6 +165,7 @@ Sources/Mochi
 │   │   ├── +Physics               falling, landing, leaping, slipping, dragging, throwing
 │   │   ├── +Geometry              screen frame, Dock, window platforms
 │   │   ├── +Awareness             media, idle, battery, load, reminders, calendar
+│   │   ├── +AI                    remarks, typed requests, two-pet conversations
 │   │   ├── +Input                 cursor shake / hover, typing along
 │   │   ├── +Toys                  treat and ball handling
 │   │   └── +Power                 adaptive frame rate, pause/resume
@@ -165,8 +183,13 @@ Sources/Mochi
 │       ├── Outfit.swift           things to wear and the bond level that unlocks each
 │       └── Dialogue.swift         everything the pet says
 ├── Brain/
-│   ├── Brain.swift                PetAction, Brain protocol, MindBrain (swap in AI here)
+│   ├── Brain.swift                PetAction, Brain protocol, MindBrain (the built-in instincts)
 │   └── Mind.swift                 needs, bond and memory (saved between launches)
+├── AI/
+│   ├── LLMClient.swift            OpenAI-compatible chat client, reply clean-up, keychain
+│   ├── PetAI.swift                every prompt: lines, remarks, decisions, banter, requests, diary
+│   ├── LLMBrain.swift             MindBrain with the model chiming in every few minutes
+│   └── PetMemory.swift            remembered facts and the diary (Application Support/Mochi)
 ├── System/
 │   ├── Platform.swift             finds window tops to stand on
 │   ├── AudioWatcher.swift         which apps are playing sound (music / video / call)
@@ -177,15 +200,18 @@ Sources/Mochi
 │   └── DayStats.swift             today's and yesterday's numbers for the check-in
 ├── UI/
 │   ├── SpeechBubble.swift         the speech bubble window
+│   ├── AskPanel.swift             the text box for typing to the pet
 │   ├── Menu/MenuHeader.swift      status card at the top of the menu
 │   ├── Components/                PetPreview, PetCard, SettingsKit (cards, rows, pills), Meter, StatTile
 │   └── Settings/
 │       ├── PetSettings.swift      saved preferences (UserDefaults)
 │       ├── SettingsView.swift     the tabbed settings panel
 │       ├── SettingsWindowController.swift
-│       └── Tabs/                  Pet, Behavior, Reminders, Today, General
+│       └── Tabs/                  Pet, Behavior, Reminders, Today, AI, General, Debug
 └── Tools/
-    └── Render.swift               `Mochi --render out.png` writes a preview sheet
+    ├── Render.swift               `Mochi --render out.png` writes a preview sheet
+    ├── LogicTest.swift            `Mochi --logic-test`
+    └── AITest.swift               `Mochi --ai-test <server> <model>` tries every AI feature once
 ```
 
 ## Make it your own
@@ -200,19 +226,20 @@ swift run Mochi --render preview.png
 **Add a new action:** add a case to `PetAction` in `Brain.swift`, give it a weight in `MindBrain`, and handle it in
 `PetController.behave` (`Pet/Controller/PetController+Behavior.swift`) (and a `Mood` in `PetView` if it needs a new pose).
 
-**Add AI:** implement the `Brain` protocol:
+**Change how the AI talks:** every prompt lives in `AI/PetAI.swift` (the pet's character is `persona`). New moments
+for the model to write lines for go in `Dialogue.moments`. Try your changes against your own server:
 
-```swift
-struct LLMBrain: Brain {
-    func nextDecision(_ ctx: PetContext) -> Decision { /* ask a model, return an action */ }
-}
+```bash
+swift run Mochi --ai-test http://localhost:11434/v1 llama3.2
 ```
 
-then pass it to `PetController(brain:)`.
+**Swap the brain:** anything that implements `Brain` can drive the pet; pass it to `PetController(brain:)`.
+`LLMBrain` is the default and behaves exactly like `MindBrain` while AI is off.
 
 ## Roadmap
 
-- [ ] AI brain that chats and decides what to do
+- [x] AI brain that talks and decides what to do (any OpenAI-compatible server)
+- [ ] A back-and-forth chat window
 - [ ] Real beat detection (needs audio-capture permission)
 - [ ] More pets and more tricks
 - [ ] Multi-monitor roaming

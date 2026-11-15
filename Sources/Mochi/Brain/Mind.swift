@@ -123,7 +123,7 @@ final class PetMind: ObservableObject {
         } else {
             energy -= dt / 2700 * exertion * p.sleepy   // about 45 minutes of pottering
             fullness -= dt / 5400 * p.appetite          // peckish after about an hour and a half
-            joy -= dt / 3600 * (fullness < 0.2 ? 2 : 1)
+            joy -= dt / 6000 * (fullness < 0.2 ? 2 : 1)     // lonely after an hour or so without attention
         }
         clampAll()
         sinceSave += dt

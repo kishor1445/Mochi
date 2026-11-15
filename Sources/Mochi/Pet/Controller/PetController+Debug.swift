@@ -8,6 +8,7 @@ enum DebugAction {
     case checkIn
     case skip(minutes: Int)         // move every reminder clock forward
     case meet(SocialKind)
+    case nextScreen
 }
 
 /// Live state for the Debug settings page, refreshed once a second by the main pet.
@@ -21,6 +22,8 @@ final class PetDebug: ObservableObject {
     @Published var sound = ""
     @Published var soundApps: [String] = []
     @Published var pets = ""
+    @Published var petState = ""
+    @Published var screens = ""
 
     var fire: ((DebugAction) -> Void)?
 }
@@ -49,7 +52,9 @@ extension PetController {
             guard buddy != nil else { return }
             forcedSocial = kind
             social = .none
-            nextVisit = Date()
+            visitWait = 0
+        case .nextScreen:
+            crossToNextScreen()
         }
         publishDebug(idle: SystemInfo.userIdleSeconds(), Date())
     }
@@ -88,9 +93,23 @@ extension PetController {
         d.sound = sound
         d.soundApps = audio.sources
 
+        // Why the pet is doing what it is doing, in plain words.
+        var why: [String] = []
+        if userAway { why.append("asleep because you're away") }
+        if media == .call { why.append("quiet for a call") }
+        if media == .video { why.append("watching a video") }
+        if focusing { why.append("calm for a focus session") }
+        if mind.energy < 0.25 { why.append("tired") }
+        if mind.fullness < 0.2 { why.append("hungry") }
+        if mind.joy < 0.25 { why.append("lonely") }
+        d.petState = "\(action) on the \(surface), next decision in \(max(0, Int(remaining)))s"
+            + (why.isEmpty ? "" : "\n" + why.joined(separator: ", "))
+        let all = NSScreen.screens
+        d.screens = all.count == 1 ? "One display" : "On display \((all.firstIndex(of: currentScreen) ?? 0) + 1) of \(all.count)"
+
         if let b = buddy {
             let mine = social == .none ? "free" : "\(socialKind.label.lowercased()) (\(social))"
-            let wait = max(0, Int(min(nextVisit, b.nextVisit).timeIntervalSince(now)))
+            let wait = max(0, Int(min(visitWait, b.visitWait)))
             d.pets = "\(species.name): \(mine) · \(b.species.name): \(b.social == .none ? "free" : "\(b.social)") · next try in \(wait)s"
         } else {
             d.pets = "Second pet is off (turn it on in Pet)"

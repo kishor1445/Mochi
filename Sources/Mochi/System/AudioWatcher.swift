@@ -123,7 +123,7 @@ final class AudioWatcher {
 
         // system sounds and helpers we should ignore
         if has(["com.apple.audio", "com.apple.coreaudio", "com.apple.systemsound", "com.apple.accessibility",
-                "com.apple.siri", "com.apple.notificationcenter", "com.apple.speech", "com.apple.voiceover",
+                "com.apple.siri", "corespeech", "com.apple.notificationcenter", "com.apple.speech", "com.apple.voiceover",
                 "com.apple.controlcenter", "mochi"]) { return nil }
 
         // Spotify and Apple Music hold their audio stream open even when paused, so only count them

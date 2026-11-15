@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 
 /// Test page: fire each reminder on demand, see what the pet thinks is going on, and stage two-pet meetings.
 struct DebugTab: View {
@@ -51,6 +52,15 @@ struct DebugTab: View {
                 SettingRow(symbol: "speaker.wave.2.fill", tint: .pink, title: "Sound: \(debug.sound)",
                            subtitle: debug.soundApps.isEmpty ? "No app is using the speakers" : debug.soundApps.joined(separator: "\n")) {
                     EmptyView()
+                }
+            }
+
+            CardSection(title: "Right now") {
+                SettingRow(symbol: "pawprint.fill", tint: .orange, title: "Doing", subtitle: debug.petState) { EmptyView() }
+                RowDivider()
+                SettingRow(symbol: "display.2", tint: .teal, title: "Displays", subtitle: debug.screens) {
+                    Button("Send to next display") { fire(.nextScreen) }
+                        .disabled(NSScreen.screens.count < 2)
                 }
             }
 

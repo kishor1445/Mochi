@@ -48,6 +48,12 @@ extension PetController {
             view.mood = .idle
             return
         }
+        // The cursor is on the next display: follow it over.
+        if onDock, d < 0 ? cx <= platform.minX + 2 : cx >= platform.maxX - 2,
+           let other = neighborScreen(left: d < 0), other.frame.contains(NSEvent.mouseLocation) {
+            cross(to: other, left: d < 0)
+            return
+        }
         facing = map(d > 0 ? 1 : -1, surface)
         view.mood = .chase
         advance(chaseSpeed * dt, autonomous: false, f)
@@ -80,7 +86,9 @@ extension PetController {
             let left = cx <= f.minX + reach && s < 0
             let right = cx >= f.maxX - reach && s > 0
             if left || right {
-                if Double.random(in: 0..<1) < 0.7 {
+                if neighborScreen(left: left) != nil {
+                    turnAround()                           // another display starts here: no wall to climb down
+                } else if Double.random(in: 0..<1) < 0.7 {
                     surface = left ? .leftWall : .rightWall
                     facing = map(-1, surface)              // head down the wall
                     snap(f)
@@ -113,7 +121,14 @@ extension PetController {
             return
         }
         if platform.id == 0 {
-            if settings.climbEdges && (forceClimb || Double.random(in: 0..<1) < 0.5) {
+            if let other = neighborScreen(left: left) {
+                // Another display starts here: hop across to explore it, or turn back.
+                if forceClimb || Double.random(in: 0..<1) < 0.45 { forceClimb = false; cross(to: other, left: left) }
+                else { turnAround() }
+            } else if let far = NSScreen.screens.filter({ $0 != currentScreen }).randomElement(), Double.random(in: 0..<1) < 0.15 {
+                // No display on this side, but there are others (above, below, further along): leap over now and then.
+                cross(to: far, left: far.frame.midX < currentScreen.frame.midX)
+            } else if settings.climbEdges && (forceClimb || Double.random(in: 0..<1) < 0.5) {
                 forceClimb = false
                 surface = left ? .leftWall : .rightWall
                 facing = map(1, surface)                    // head up the wall

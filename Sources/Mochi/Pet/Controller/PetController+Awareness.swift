@@ -25,6 +25,7 @@ extension PetController {
         var m = settings.reactToMedia ? audio.current : .none
         // "Other" just means some app has the speakers open, which is often silence: opt-in only.
         if m == .other, !settings.reactToOtherAudio { m = .none }
+        if m == .call, !settings.quietOnCalls { m = .none }
         if m != media { media = m; mediaChanged() }
 
         // Is anyone there?
@@ -42,11 +43,12 @@ extension PetController {
 
         // Been working a long time?
         if idle < 300 { activeSeconds += step } else if idle > 600 { activeSeconds = 0 }
-        if settings.breakReminders, activeSeconds >= TimeInterval(settings.breakMinutes * 60), remindersBlocked == nil {
+        if settings.breakReminders, mayRemind(overdue: activeSeconds - TimeInterval(settings.breakMinutes * 60)) {
             fireStretch(now)
         }
         checkReminders(step, idle: idle, now)
         checkCalendar(now)
+        if now.timeIntervalSince(lastDiaryCheck) > 300 { lastDiaryCheck = now; PetAI.shared.diaryIfDue(log) }
         publishDebug(idle: idle, now)
 
         if settings.systemAware { checkHour(); checkBattery(now); checkLoad(now) }
@@ -58,19 +60,19 @@ extension PetController {
         case .music, .other:
             view.musicBpm = .random(in: 100...126)
             if !isMain {}
-            else if media == .music { say("Ooh, music! 🎵") }
+            else if media == .music { react("Music just started playing\(soundSource)", fallback: "Ooh, music! 🎵", note: true) }
             else if Bool.random() { say("Something's playing… 🎧") }
             if canAct, !userAway { apply(Decision(action: .dance, duration: 7)) }
         case .video:
             view.musicBpm = 0
-            if isMain { say("Movie time! 🍿") }
+            if isMain { react("Your human started watching a video\(soundSource)", fallback: "Movie time! 🍿", note: true) }
             if canAct, !userAway { apply(Decision(action: .idle, duration: 5)) }
         case .call:
             view.musicBpm = 0
             if isMain { say("Shh… I'll be quiet 🤫", force: true) }
             if canAct, !userAway { apply(Decision(action: .idle, duration: 5)) }
         case .none:
-            if view.musicBpm > 0, isMain { say("Aww, the music stopped 🥲") }
+            if view.musicBpm > 0, isMain { react("The music you were dancing to just stopped", fallback: "Aww, the music stopped 🥲") }
             view.musicBpm = 0
         }
     }
@@ -78,7 +80,7 @@ extension PetController {
     func welcomeBack() {
         guard isMain else { return }
         log.tookBreak()
-        say("Welcome back! 👋")
+        react("Your human just came back to the Mac after a few minutes away", fallback: "Welcome back! 👋")
         view.spawnHearts(3)
         if canAct { apply(Decision(action: .happy, duration: 2)) }
     }
@@ -88,11 +90,11 @@ extension PetController {
         defer { lastHour = h }
         guard lastHour != -1, h != lastHour else { return }
         switch h {
-        case 12: say("Lunch time! 🍱")
-        case 17: say("Almost done for the day? 🌇")
+        case 12: react("It just turned noon: lunch time", fallback: "Lunch time! 🍱")
+        case 17: react("It just turned 5 pm: the working day is nearly over", fallback: "Almost done for the day? 🌇")
         case 18: if settings.dailyCheckIn { say(log.current.summary(prefix: "Today"), seconds: 7) }
-        case 22: say("Getting late… bedtime soon? 🌙")
-        case 0: say("It's past midnight! Time to sleep? 😴")
+        case 22: react("It just turned 10 pm and your human is still at the Mac", fallback: "Getting late… bedtime soon? 🌙")
+        case 0: react("It is past midnight and your human is still at the Mac", fallback: "It's past midnight! Time to sleep? 😴", note: true)
         default: break
         }
     }
@@ -102,13 +104,14 @@ extension PetController {
         lastBattery = now
         guard let b = SystemInfo.battery() else { return }
         if let was = wasCharging, !was, b.charging {
-            say("Ahh, power! ⚡")
+            react("The Mac's charger was just plugged in", fallback: "Ahh, power! ⚡")
             view.spawnHearts(2)
         }
         wasCharging = b.charging
         if b.level <= 15, !b.charging, !batteryWarned {
             batteryWarned = true
-            say("Battery's at \(b.level)%. Plug me in? 🔋", force: true)
+            react("The Mac's battery is down to \(b.level)% and it is not charging: ask to be plugged in and mention the number",
+                  fallback: "Battery's at \(b.level)%. Plug me in? 🔋", force: true)
         }
         if b.charging || b.level > 30 { batteryWarned = false }
         view.shiver = b.level <= 10 && !b.charging      // running on fumes
@@ -128,14 +131,15 @@ extension PetController {
         view.sweat = busySeconds >= 10
         if busySeconds >= 25, now > busyCooldown, canAct, action != .sleep {
             busyCooldown = now.addingTimeInterval(600)
-            say(Dialogue.busyMac.randomElement() ?? "Phew!")
+            react("The Mac's processor has been working flat out for half a minute, something heavy is running",
+                  fallback: Dialogue.busyMac.randomElement() ?? "Phew!")
         }
         let state = ProcessInfo.processInfo.thermalState
         if state == .serious || state == .critical {
             view.sweat = true
             if now > hotCooldown {
                 hotCooldown = now.addingTimeInterval(900)
-                say(Dialogue.hotMac.randomElement() ?? "It's warm in here!")
+                react("The Mac is running hot", fallback: Dialogue.hotMac.randomElement() ?? "It's warm in here!")
             }
         }
     }
@@ -150,6 +154,13 @@ extension PetController {
         return nil
     }
 
+    /// A reminder that is due waits for a focus session to end and for you to come back. It waits for a call
+    /// too, but only five minutes: a bubble is silent, and some people sit in a voice channel for hours.
+    func mayRemind(overdue: TimeInterval) -> Bool {
+        guard overdue >= 0, focusEnds == nil, !userAway else { return false }
+        return media != .call || overdue >= 300
+    }
+
     /// Each reminder counts the time you are at your Mac. Reading or watching without touching anything
     /// still counts; the clock pauses once you have been gone five minutes and starts over after fifteen.
     func checkReminders(_ dt: TimeInterval, idle: TimeInterval, _ now: Date) {
@@ -158,9 +169,8 @@ extension PetController {
         for kind in ReminderKind.allCases {
             guard let every = settings.interval(kind) else { reminderElapsed[kind] = nil; continue }
             reminderElapsed[kind, default: 0] += dt
-            guard reminderElapsed[kind, default: 0] >= TimeInterval(every * 60),
-                  now.timeIntervalSince(lastReminder) > 45,           // never two nudges on top of each other
-                  remindersBlocked == nil else { continue }
+            guard mayRemind(overdue: reminderElapsed[kind, default: 0] - TimeInterval(every * 60)),
+                  now.timeIntervalSince(lastReminder) > 45 else { continue }      // never two nudges on top of each other
             fireReminder(kind, now)
         }
     }
@@ -170,21 +180,23 @@ extension PetController {
         reminderElapsed[kind] = 0
         lastReminder = now
         if action == .sleep, canAct { action = .idle; remaining = 1 }     // wake up to say it
-        say(Dialogue.reminder(kind).randomElement() ?? kind.label, force: true, seconds: 7)
         view.spawnHearts(1)
-        guard canAct else { return }
-        switch kind {
-        case .water: apply(Decision(action: .happy, duration: 1.6))
-        case .posture: apply(Decision(action: .stretch, duration: 2.6))
-        case .eyes: apply(Decision(action: .lookAround, duration: 3))
+        if canAct {
+            switch kind {
+            case .water: apply(Decision(action: .happy, duration: 1.6))
+            case .posture: apply(Decision(action: .stretch, duration: 2.6))
+            case .eyes: apply(Decision(action: .lookAround, duration: 3))
+            }
         }
+        // Said last, so nothing the action says ("*yaaawn*") can replace the reminder.
+        say(Dialogue.reminder(kind).randomElement() ?? kind.label, force: true, seconds: 7)
     }
 
     func fireStretch(_ now: Date = Date()) {
         activeSeconds = 0
         lastReminder = now
-        say("You've been at it for a while. Time to stretch! 🧘", force: true, seconds: 7)
         if canAct { apply(Decision(action: .stretch, duration: 3)) }
+        say("You've been at it for a while. Time to stretch! 🧘", force: true, seconds: 7)
     }
 
     func checkCalendar(_ now: Date) {

@@ -14,5 +14,6 @@
     <key>NSHighResolutionCapable</key><true/>
     <key>NSCalendarsFullAccessUsageDescription</key><string>Mochi reads the start time and title of your upcoming events so your pet can remind you a few minutes before they begin. Nothing leaves your Mac.</string>
     <key>NSCalendarsUsageDescription</key><string>Mochi reads the start time and title of your upcoming events so your pet can remind you a few minutes before they begin. Nothing leaves your Mac.</string>
+    <key>NSAppTransportSecurity</key><dict><key>NSAllowsLocalNetworking</key><true/></dict>
 </dict>
 </plist>

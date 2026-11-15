@@ -2,7 +2,7 @@ import SwiftUI
 import AppKit
 
 enum SettingsPage: String, CaseIterable, Identifiable {
-    case pet, behavior, reminders, today, general, debug
+    case pet, behavior, reminders, today, ai, general, debug
 
     var id: String { rawValue }
 
@@ -12,6 +12,7 @@ enum SettingsPage: String, CaseIterable, Identifiable {
         case .behavior: return "Behavior"
         case .reminders: return "Reminders"
         case .today: return "Today"
+        case .ai: return "AI"
         case .general: return "General"
         case .debug: return "Debug"
         }
@@ -23,6 +24,7 @@ enum SettingsPage: String, CaseIterable, Identifiable {
         case .behavior: return "Where your pet goes and what it notices"
         case .reminders: return "Gentle nudges while you work"
         case .today: return "Your day in numbers"
+        case .ai: return "Give your pet a language model to think and talk with"
         case .general: return "Size, speech and system options"
         case .debug: return "Test reminders and see what the pet notices"
         }
@@ -34,6 +36,7 @@ enum SettingsPage: String, CaseIterable, Identifiable {
         case .behavior: return "figure.walk"
         case .reminders: return "bell.fill"
         case .today: return "chart.bar.fill"
+        case .ai: return "sparkles"
         case .general: return "gearshape.fill"
         case .debug: return "ladybug.fill"
         }
@@ -134,6 +137,7 @@ struct SettingsView: View {
                     case .behavior: BehaviorTab(settings: settings)
                     case .reminders: RemindersTab(settings: settings)
                     case .today: TodayTab(log: .shared)
+                    case .ai: AITab(settings: settings)
                     case .general: GeneralTab(settings: settings, onBringBack: onBringBack)
                     case .debug: DebugTab(settings: settings)
                     }

@@ -45,7 +45,7 @@ final class DailyLog: ObservableObject {
     private var work: DayStats                  // edited every second; published now and then
     private var sincePublish: TimeInterval = 0
 
-    private static func key(_ date: Date = Date()) -> String {
+    static func key(_ date: Date = Date()) -> String {
         let c = Calendar.current.dateComponents([.year, .month, .day], from: date)
         return String(format: "%04d-%02d-%02d", c.year ?? 0, c.month ?? 0, c.day ?? 0)
     }

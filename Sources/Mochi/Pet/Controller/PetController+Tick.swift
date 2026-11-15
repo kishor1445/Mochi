@@ -26,7 +26,7 @@ extension PetController {
         }
 
         // Safety net: if the pet ever ends up outside every screen, bring it back.
-        if !held, !isOnScreen() { bringBack() }
+        if !held, jump == nil, !isOnScreen() { bringBack() }
 
         trackCursor(dt, now)
         trackTyping(dt, now)
@@ -94,8 +94,9 @@ extension PetController {
             }
 
             remaining -= TimeInterval(dt)
+            stayLively(dt, f)
             maybeGreet(now)
-            maybeVisit(now)
+            maybeVisit(dt)
             if remaining <= 0 { apply(brain.nextDecision(context(f))) }
             behave(dt, f)
             targetAngle = angle(for: surface)

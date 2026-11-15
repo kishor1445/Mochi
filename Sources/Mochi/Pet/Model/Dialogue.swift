@@ -1,6 +1,6 @@
 import Foundation
 
-/// Everything the pet can say. Later an AI brain can replace these canned lines.
+/// Everything the pet can say on its own. With AI on, a model rewrites most of these (see `moments`).
 enum Dialogue {
     static func timeGreeting(hour: Int) -> String {
         switch hour {
@@ -107,6 +107,7 @@ enum Dialogue {
     static let danceTogether = ["Dance with me!", "Let's dance! 🎶", "Shake it!"]
     static let napTogether = ["Nap buddies… 💤", "Room for one more?", "Shh… sleepy time."]
     static let impressed = ["Whoa!", "So cool!", "Do it again!", "Show-off… 😏"]
+    static let newScreen = ["Ooh, another screen!", "What's over here?", "Exploring!", "More room to roam!"]
     static let jealous = ["Me too! Me too!", "Hey, what about me?", "My turn!"]
 
     // Outfits
@@ -134,4 +135,64 @@ enum Dialogue {
     static let focusStart = ["Focus time! I'll keep quiet 🤫", "You've got this! I'll be right here.", "Let's do this! 💪"]
     static let focusDone = ["Focus done! Great work 🎉 Time for a break.", "You did it! 🎉 Stretch a little?", "All done! Proud of you 💖"]
     static let focusStopped = ["Okay, break time!", "Stopping here. Nice effort!"]
+
+    // MARK: For the AI
+
+    /// A group of canned lines and the moment they are for. With AI switched on, the model writes fresh
+    /// lines for each moment in the pet's own voice; these stay as the examples and the fallback.
+    /// Reminders, calendar alerts and anything with a number in it are left out: those must stay exact.
+    struct Moment {
+        let key: String
+        let about: String
+        let lines: [String]
+    }
+
+    static func moments(for s: Species) -> [Moment] {
+        [
+            Moment(key: "hello", about: "saying hi to your human out of the blue, or a tiny kind nudge", lines: general),
+            Moment(key: "self", about: "a little in-character remark about yourself or what you feel like doing", lines: s.lines),
+            Moment(key: "bonded", about: "telling your human how much you like them", lines: ["I like hanging out with you 💕", "You're my favourite human!"]),
+            Moment(key: "petted", about: "your human just petted you", lines: petted),
+            Moment(key: "startled", about: "you were woken up by a poke while asleep", lines: startled),
+            Moment(key: "dragged", about: "your human picked you up and is carrying you around", lines: dragged),
+            Moment(key: "landedWindow", about: "you just jumped up onto the top of a window", lines: landedWindow),
+            Moment(key: "clung", about: "you just grabbed the edge of the screen and started climbing", lines: clung),
+            Moment(key: "slipping", about: "you are losing your grip on the wall and about to fall", lines: slipping),
+            Moment(key: "ouch", about: "you just fell and landed on the ground, playing it cool", lines: ouch),
+            Moment(key: "leaping", about: "the instant you jump (two words at most)", lines: leaping),
+            Moment(key: "yum", about: "you just ate a treat", lines: yum),
+            Moment(key: "hover", about: "the mouse cursor is hovering right over you", lines: hover),
+            Moment(key: "treatDropped", about: "a treat just dropped from the sky for you", lines: treatDropped),
+            Moment(key: "hungry", about: "you are hungry and hinting for a snack (your favourite is \(s.treatEmoji))", lines: hungry(s)),
+            Moment(key: "lonely", about: "you are lonely and want attention", lines: lonely),
+            Moment(key: "sleepy", about: "you can barely stay awake", lines: sleepy),
+            Moment(key: "stuffed", about: "you are offered a treat but are far too full", lines: stuffed),
+            Moment(key: "missedYou", about: "your human is back after many hours away", lines: missedYou),
+            Moment(key: "ballDropped", about: "a toy just appeared to play with", lines: ballDropped),
+            Moment(key: "kick", about: "the instant you kick the ball (two words at most)", lines: kick),
+            Moment(key: "playedEnough", about: "the ball game just ended", lines: playedEnough),
+            Moment(key: "tooTired", about: "you are too tired to play right now", lines: tooTired),
+            Moment(key: "typingRoll", about: "your human has been typing steadily for a minute", lines: typingRoll),
+            Moment(key: "typingLong", about: "your human has been typing for a very long time", lines: typingLong),
+            Moment(key: "typingFast", about: "your human is typing extremely fast", lines: typingFast),
+            Moment(key: "power", about: "shouting as you unleash your signature power move", lines: power(s)),
+            Moment(key: "thrown", about: "you were just thrown through the air", lines: thrown),
+            Moment(key: "crashLanded", about: "you crash-landed after being thrown and are dizzy", lines: crashLanded),
+            Moment(key: "peekaboo", about: "you pop out from hiding behind the screen edge", lines: peekaboo),
+            Moment(key: "tagStart", about: "starting a game of tag with your pet friend", lines: tagStart),
+            Moment(key: "tagCaught", about: "you just caught your pet friend in tag", lines: tagCaught),
+            Moment(key: "tagEscaped", about: "your pet friend failed to catch you in tag", lines: tagEscaped),
+            Moment(key: "followMe", about: "telling your pet friend to follow you", lines: followMe),
+            Moment(key: "danceTogether", about: "inviting your pet friend to dance", lines: danceTogether),
+            Moment(key: "napTogether", about: "settling down for a nap next to your pet friend", lines: napTogether),
+            Moment(key: "impressed", about: "your pet friend just did an impressive trick", lines: impressed),
+            Moment(key: "newScreen", about: "you just crossed onto another display", lines: newScreen),
+            Moment(key: "jealous", about: "your human petted the other pet and you want some too", lines: jealous),
+            Moment(key: "busyMac", about: "the Mac's processor has been flat out for a while", lines: busyMac),
+            Moment(key: "hotMac", about: "the Mac is running hot", lines: hotMac),
+            Moment(key: "focusStart", about: "a focus session starts: you promise to keep quiet and cheer them on", lines: focusStart),
+            Moment(key: "focusDone", about: "a focus session just finished: celebrate and suggest a break", lines: focusDone),
+            Moment(key: "focusStopped", about: "your human stopped a focus session early", lines: focusStopped)
+        ]
+    }
 }

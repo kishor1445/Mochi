@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- AI (optional): connect any OpenAI-compatible server in Settings › AI, local (Ollama, LM Studio, llama.cpp) or hosted. The API key is kept in the keychain, and the pet falls back to its built-in lines and behaviour whenever the server is off or slow
+- AI: fresh lines written by the model for every moment the pet speaks, in its own voice, generated in the background and saved
+- AI: remarks about what is going on: music or a video starting (and in which app), you coming back, the time of day, the battery, a busy Mac, the end of a focus session
+- AI: every few minutes the model chooses the pet's next move; the built-in instincts handle the rest
+- AI: two pets have a short conversation when they meet to say hello
+- AI: "Ask Mochi…" in the menu opens a text box for requests in plain words: tricks, treats, focus sessions, reminders, outfits, size, or a question
+- AI: the pet remembers a few facts about you and writes a diary entry for each day (Settings › AI)
+- `Mochi --ai-test <server> <model>` tries every AI feature once against a server and prints what came back
 - Tough pets: a second, rougher drawing style with angular bodies, slanted eyes under heavy brows, fangs and claws, and no rosy cheeks
 - Two new tough pets: Fang the wolf and Chomp the shark, each with its own personality, lines, snack, toy and power move
 - Rex, Bolt and Ember are redrawn in the tough style: Rex has a toothy jaw, Bolt is a battle mech with a visor and chest reactor, Ember has spread wings and slit eyes
@@ -14,6 +22,12 @@
 - Reminders can be set to every 10 minutes, and the stretch break has its own interval instead of a fixed 50 minutes
 - Fixed: reminders rarely fired, because every clock restarted after five minutes without input. They now keep counting while you read or watch, pause when you step away, and only start over after a 15-minute break
 - Fixed: the pet acted as if music was playing when it wasn't. Sound from browsers and other apps is ignored unless you turn on "React to other sound too", and chat apps only count as a call while they use the microphone
+- Multiple displays: the pet hops across where two displays touch side by side, now and then leaps to any other display, follows your cursor to the next one, and goes to find the second pet when they are on different displays
+- Livelier: a pet that has not moved for 40 seconds (with no call, video, focus session or absence to explain it) gets up, wanders and says something. It no longer gets drowsy after three minutes without a click, and sulks less when hungry or lonely
+- The Debug page shows what the pet is doing and why, which display it is on, and can send it to the next display
+- Fixed: posture and stretch reminders were replaced by the pet's own "*yaaawn*" bubble about half the time
+- Fixed: sitting in a Discord voice channel (or any open call) froze the pet and held every reminder back for as long as it lasted. On a call the pet now stays silent but keeps moving, and a due reminder waits at most five minutes. "Stay quiet during calls" can be switched off in Behavior
+- `Mochi --logic-test` checks the reminder clocks, twenty simulated minutes of pet life and every two-pet meeting
 - Fixed: spins, backflips and zoomies could start while hanging from the top of the screen or a wall, and an interrupted trick could leave the pet tilted
 
 ## 0.5.0

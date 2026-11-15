@@ -53,8 +53,8 @@ struct PetContext {
     let bondLevel: Int
 }
 
-/// The seam for future AI: anything that can pick the next Decision.
-/// Today: `MindBrain`. Later: an `LLMBrain` that calls a model.
+/// Anything that can pick the next Decision.
+/// `MindBrain` is the built-in instincts; `LLMBrain` (AI/LLMBrain.swift) lets a model chime in on top of it.
 protocol Brain {
     func nextDecision(_ ctx: PetContext) -> Decision
 }
@@ -69,7 +69,8 @@ final class MindBrain: Brain {
 
         let p = ctx.species.personality
         let late = ctx.hour >= 23 || ctx.hour < 6
-        let drowsy = ctx.secondsSinceInteraction > 180 || late
+        // Sleepy late at night, or when nobody has played with it for a good while (not just a few minutes).
+        let drowsy = ctx.secondsSinceInteraction > 1200 || late
         let tired = ctx.energy < 0.25
         let hungry = ctx.fullness < 0.2
         let lonely = ctx.joy < 0.25
@@ -92,8 +93,9 @@ final class MindBrain: Brain {
 
         if quiet {
             // On a call or in a focus session: stay quiet and mostly still.
+            // On a call it says nothing but still potters about; in a focus session it mostly stays put.
             o = [(10, d(.idle, 4, 8)), (2, d(.lookAround, 2, 3))]
-            if ctx.focusing { o.append((2, d(.walk(axis: axis), 2, 4))) }
+            o.append((ctx.focusing ? 2 : 9, d(.walk(axis: axis), 2, 5)))
             if drowsy || tired { o.append((3, d(.sleep, 10, 20))) }
         } else {
             switch ctx.media {
@@ -112,7 +114,7 @@ final class MindBrain: Brain {
 
             case .none, .call:
                 if ctx.surface == .floor || ctx.surface == .air {
-                    o = [(6, d(.idle, 2, 5)), (10, d(.walk(axis: axis), 2, 7)), (1.5, d(.happy, 1.5, 1.5)),
+                    o = [(4, d(.idle, 2, 5)), (10, d(.walk(axis: axis), 2, 7)), (1.5, d(.happy, 1.5, 1.5)),
                          (2, d(.stretch, 2.4, 2.4)), (1.5, d(.spin, 0.9, 0.9)), (1.5, d(.dance, 4, 4)),
                          (2.5, d(.lookAround, 3, 3)), (1.5, d(.zoomies, 3.5, 3.5)),
                      (1.2, d(.power, 2.2, 2.2)), (1.2, d(.flip, 0.8, 0.8))]
@@ -122,7 +124,7 @@ final class MindBrain: Brain {
                          (1, d(.happy, 1.5, 1.5)), (1, d(.stretch, 2.4, 2.4))]
                 }
                 if ctx.cursorDistance < 500 { o.append((4, d(.chase, 3, 6))) }
-                if drowsy { o.append((6, d(.sleep, 8, 20))) } else if tired { o.append((3, d(.sleep, 15, 30))) }
+                if drowsy { o.append((3, d(.sleep, 8, 20))) } else if tired { o.append((3, d(.sleep, 15, 30))) }
             }
 
             if ctx.platformAbove && ctx.surface == .floor {
@@ -137,7 +139,7 @@ final class MindBrain: Brain {
             // Unmet needs: sit and sulk, and now and then say what's wrong.
             if hungry || lonely {
                 let lines = hungry ? Dialogue.hungry(ctx.species) : Dialogue.lonely
-                o.append((5, Decision(action: .mope, duration: .random(in: 4...7), line: needLine(lines, quiet: false))))
+                o.append((2.5, Decision(action: .mope, duration: .random(in: 3...5), line: needLine(lines, quiet: false))))
             }
         }
 
@@ -147,9 +149,9 @@ final class MindBrain: Brain {
             case .sleep:
                 return p.sleepy * (tired ? 4 : 1) * (ctx.energy > 0.8 && !late ? 0.4 : 1)
             case .dance, .zoomies, .spin, .hide, .power, .flip:
-                return p.playful * (joyful ? 1.6 : 1) * (tired ? 0.2 : 1) * (lonely || hungry ? 0.4 : 1)
+                return p.playful * (joyful ? 1.6 : 1) * (tired ? 0.2 : 1) * (lonely || hungry ? 0.7 : 1)
             case .happy:
-                return joyful ? 1.8 : (lonely || hungry ? 0.3 : 1)
+                return joyful ? 1.8 : (lonely || hungry ? 0.6 : 1)
             case .chase:
                 return p.cuddly * (lonely ? 2 : 1) * (tired ? 0.4 : 1) * (ctx.bondLevel >= 3 ? 1.3 : 1)
             case .lookAround, .climbEdge, .leap:

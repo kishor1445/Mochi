@@ -8,6 +8,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var pauseReasons = Set<String>()
     private var settingsWindow: SettingsWindowController!
     private var statusItem: NSStatusItem!
+    private lazy var askPanel = AskPanel()
     private var cancellables = Set<AnyCancellable>()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -131,6 +132,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.addItem(header)
         menu.addItem(.separator())
 
+        if PetAI.shared.on(.commands) {
+            menu.addItem(item("Ask \(name)…", "text.bubble", #selector(ask), key: "k"))
+        }
         menu.addItem(item("Give a Treat", "gift", #selector(giveTreat)))
         menu.addItem(item("Play Ball", "soccerball", #selector(playBall)))
         menu.addItem(submenu("Interact", "hand.wave", [
@@ -173,6 +177,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         items.forEach(sub.addItem)
         parent.submenu = sub
         return parent
+    }
+
+    /// Opens a text box above the pet; what you type is handed to the model (see `PetController.ask`).
+    @objc private func ask() {
+        let screen = pet.currentScreen.visibleFrame
+        let above = NSPoint(x: pet.cx, y: pet.cy + pet.half + 46 * pet.scale)
+        askPanel.show(above: above, in: screen, placeholder: "Ask \(PetSettings.shared.species.name) something…") { [weak self] text in
+            self?.pet.ask(text)
+        }
     }
 
     @objc private func sayHi() { pet.greet() }

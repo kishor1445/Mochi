@@ -20,6 +20,10 @@ struct BehaviorTab: View {
                 ToggleRow(symbol: "music.note", tint: .pink, title: "React to music, videos and calls",
                           subtitle: "Dances to music, settles for videos, goes quiet on calls", isOn: $settings.reactToMedia)
                 RowDivider()
+                ToggleRow(symbol: "phone.fill", tint: .green, title: "Stay quiet during calls",
+                          subtitle: "No speech bubbles while Zoom, Teams, FaceTime, Discord and the like are using the microphone. Turn off if you sit in a voice channel all day",
+                          isOn: $settings.quietOnCalls)
+                RowDivider()
                 ToggleRow(symbol: "speaker.wave.2.fill", tint: .purple, title: "React to other sound too",
                           subtitle: "Browsers, games and other apps. Off by default: many apps hold the speakers open while silent",
                           isOn: $settings.reactToOtherAudio)

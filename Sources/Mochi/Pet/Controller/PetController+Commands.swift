@@ -114,7 +114,8 @@ extension PetController {
         mind.focusedTogether()
         log.focused(minutes: focusPlanned)
         view.spawnHearts(5)
-        say(Dialogue.focusDone.randomElement() ?? "Focus done! 🎉", force: true)
+        react("Your human just finished a \(focusPlanned)-minute focus session with you beside them: celebrate and suggest a break",
+              fallback: Dialogue.focusDone.randomElement() ?? "Focus done! 🎉", force: true, note: true)
         if canAct { apply(Decision(action: .dance, duration: 5)) }
     }
 

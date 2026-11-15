@@ -43,20 +43,21 @@ extension PetController {
             && slipTimer <= 0 && hidePhase == .none
     }
 
-    func maybeVisit(_ now: Date) {
+    func maybeVisit(_ dt: CGFloat) {
         guard let b = buddy else { return }
         stepAside(b)
-        guard now >= nextVisit, social == .none else { return }
+        visitWait -= TimeInterval(dt)
+        guard visitWait <= 0, social == .none else { return }
         let forced = forcedSocial != nil
 
         guard sociable, b.canAct, !b.userAway, b.social == .none, b.treat == nil, b.ball == nil else {
-            nextVisit = now.addingTimeInterval(6)
+            visitWait = 6
             return
         }
         // They can only meet on the ground: whoever is up a wall, on the ceiling or on a window comes down first.
         guard onDock else {
             if forced || Bool.random() { comeDown() }
-            nextVisit = now.addingTimeInterval(4)
+            visitWait = 4
             return
         }
         guard b.onDock else {
@@ -65,13 +66,19 @@ extension PetController {
                 if forced, b.action == .sleep { b.action = .idle; b.remaining = 1 }
                 b.comeDown()
             }
-            nextVisit = now.addingTimeInterval(4)
+            visitWait = 4
+            return
+        }
+        // On different displays: go over to where the other one is first.
+        guard currentScreen == b.currentScreen else {
+            crossToward(b)
+            visitWait = 3
             return
         }
         if forced, b.action == .sleep, forcedSocial != .nap { b.action = .idle; b.remaining = 1 }
 
-        nextVisit = now.addingTimeInterval(.random(in: 25...55))
-        b.nextVisit = max(b.nextVisit, now.addingTimeInterval(20))
+        visitWait = .random(in: 40...90)
+        b.visitWait = max(b.visitWait, 20)
         let kind = forcedSocial ?? pickSocial(b)
         forcedSocial = nil
         beginSocial(kind, with: b)
@@ -97,6 +104,7 @@ extension PetController {
         socialTimer = 12
         // The other pet stops and waits, unless it is asleep or simply being petted.
         let joining = kind != .jealous && !(kind == .nap && b.action == .sleep)
+        if kind == .greet { prepareBanter(with: b) }
         if joining {
             b.invited(by: self)
             if Double.random(in: 0..<1) < 0.5 { say(Dialogue.calling(b.species.name).randomElement() ?? "Hey!") }
@@ -190,13 +198,23 @@ extension PetController {
 
     /// Reached the other pet: now do the thing.
     func arrive(_ b: PetController) {
+        meetings += 1
         mind.reunitedWithBuddy()
         switch socialKind {
         case .greet:
             view.spawnHearts(3)
+            if startBanter(with: b) { break }           // the model wrote them a conversation
             say(Dialogue.buddyHello(b.species.name).randomElement() ?? "Hi!")
-            endSocial(cheer: true)
-            b.cheer(for: self, line: nil)
+            if banterAsked {
+                // The words are still on their way: stand together for a few seconds and see if they come.
+                banterArrived = Date()
+                facing = b.cx > cx ? 1 : -1
+                b.facing = cx > b.cx ? 1 : -1
+                for pet in [self, b] { pet.social = .none; pet.action = .happy; pet.remaining = 5 }
+            } else {
+                endSocial(cheer: true)
+                b.cheer(for: self, line: nil)
+            }
 
         case .jealous:
             view.spawnHearts(2)
@@ -243,7 +261,7 @@ extension PetController {
         action = .happy
         remaining = 2.2
         view.spawnHearts(2)
-        nextVisit = max(nextVisit, Date().addingTimeInterval(20))
+        visitWait = max(visitWait, 20)
         if let line {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.9) { [weak self] in self?.say(line) }
         }

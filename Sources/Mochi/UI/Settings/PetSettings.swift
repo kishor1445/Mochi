@@ -115,8 +115,22 @@ final class PetSettings: ObservableObject {
     /// Minutes of work before the stretch reminder.
     @Published var breakMinutes: Int { didSet { d.set(breakMinutes, forKey: "breakMinutes") } }
     /// React to sound from browsers, games and other apps that aren't known music or video players.
+    /// Stay quiet while a chat app is using the microphone.
+    @Published var quietOnCalls: Bool { didSet { d.set(quietOnCalls, forKey: "quietOnCalls") } }
     @Published var reactToOtherAudio: Bool { didSet { d.set(reactToOtherAudio, forKey: "reactToOtherAudio") } }
     @Published var systemAware: Bool { didSet { d.set(systemAware, forKey: "systemAware") } }
+    // AI (any OpenAI-compatible server). Off until a server and model are set.
+    @Published var aiEnabled: Bool { didSet { d.set(aiEnabled, forKey: "aiEnabled") } }
+    @Published var aiBaseURL: String { didSet { d.set(aiBaseURL, forKey: "aiBaseURL") } }
+    @Published var aiModel: String { didSet { d.set(aiModel, forKey: "aiModel") } }
+    /// Kept in the keychain rather than the preferences file.
+    @Published var aiKey: String { didSet { if aiKey != oldValue { Keychain.write(aiKey) } } }
+    @Published var aiDialogue: Bool { didSet { d.set(aiDialogue, forKey: "aiDialogue") } }
+    @Published var aiReactions: Bool { didSet { d.set(aiReactions, forKey: "aiReactions") } }
+    @Published var aiBrain: Bool { didSet { d.set(aiBrain, forKey: "aiBrain") } }
+    @Published var aiBanter: Bool { didSet { d.set(aiBanter, forKey: "aiBanter") } }
+    @Published var aiMemory: Bool { didSet { d.set(aiMemory, forKey: "aiMemory") } }
+    @Published var aiCommands: Bool { didSet { d.set(aiCommands, forKey: "aiCommands") } }
     /// Mirrors the system's login item (not stored here: macOS owns it).
     @Published var launchAtLogin = LoginItem.enabled
 
@@ -143,7 +157,19 @@ final class PetSettings: ObservableObject {
         reminderMinutes = d.dictionary(forKey: "reminderMinutes") as? [String: Int] ?? [ReminderKind.water.rawValue: 60]
         breakReminders = d.object(forKey: "breakReminders") as? Bool ?? true
         breakMinutes = d.object(forKey: "breakMinutes") as? Int ?? 50
+        quietOnCalls = d.object(forKey: "quietOnCalls") as? Bool ?? true
         reactToOtherAudio = d.object(forKey: "reactToOtherAudio") as? Bool ?? false
         systemAware = d.object(forKey: "systemAware") as? Bool ?? true
+        aiEnabled = d.object(forKey: "aiEnabled") as? Bool ?? false
+        aiBaseURL = d.string(forKey: "aiBaseURL") ?? "http://localhost:11434/v1"
+        aiModel = d.string(forKey: "aiModel") ?? ""
+        // Only look in the keychain once AI has been set up, so nobody else ever sees a keychain prompt.
+        aiKey = d.object(forKey: "aiEnabled") != nil ? Keychain.read() : ""
+        aiDialogue = d.object(forKey: "aiDialogue") as? Bool ?? true
+        aiReactions = d.object(forKey: "aiReactions") as? Bool ?? true
+        aiBrain = d.object(forKey: "aiBrain") as? Bool ?? true
+        aiBanter = d.object(forKey: "aiBanter") as? Bool ?? true
+        aiMemory = d.object(forKey: "aiMemory") as? Bool ?? true
+        aiCommands = d.object(forKey: "aiCommands") as? Bool ?? true
     }
 }

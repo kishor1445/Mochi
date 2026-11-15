@@ -97,7 +97,10 @@ extension PetController {
         // Score the rally and remember the best one.
         let best = UserDefaults.standard.integer(forKey: "bestRally")
         let record = b.kicks > best && b.kicks >= 3
-        if record { UserDefaults.standard.set(b.kicks, forKey: "bestRally") }
+        if record {
+            UserDefaults.standard.set(b.kicks, forKey: "bestRally")
+            if PetAI.shared.on(.memory) { PetMemory.shared.note("New ball rally record together: \(b.kicks) kicks") }
+        }
         say(b.kicks == 0 ? (Dialogue.playedEnough.randomElement() ?? "That was fun!")
                          : Dialogue.rally(b.kicks, record: record), force: true, seconds: 4.5)
         action = .happy
