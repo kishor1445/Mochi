@@ -88,7 +88,7 @@ enum ReminderKind: String, CaseIterable, Identifiable {
         }
     }
 
-    static let intervals = [15, 20, 30, 45, 60, 90, 120]
+    static let intervals = [10, 15, 20, 30, 45, 50, 60, 90, 120]
 }
 
 /// User preferences, saved automatically to UserDefaults.
@@ -112,6 +112,10 @@ final class PetSettings: ObservableObject {
     /// Minutes between each gentle reminder; 0 = off.
     @Published var reminderMinutes: [String: Int] { didSet { d.set(reminderMinutes, forKey: "reminderMinutes") } }
     @Published var breakReminders: Bool { didSet { d.set(breakReminders, forKey: "breakReminders") } }
+    /// Minutes of work before the stretch reminder.
+    @Published var breakMinutes: Int { didSet { d.set(breakMinutes, forKey: "breakMinutes") } }
+    /// React to sound from browsers, games and other apps that aren't known music or video players.
+    @Published var reactToOtherAudio: Bool { didSet { d.set(reactToOtherAudio, forKey: "reactToOtherAudio") } }
     @Published var systemAware: Bool { didSet { d.set(systemAware, forKey: "systemAware") } }
     /// Mirrors the system's login item (not stored here: macOS owns it).
     @Published var launchAtLogin = LoginItem.enabled
@@ -138,6 +142,8 @@ final class PetSettings: ObservableObject {
         calendarAlerts = d.object(forKey: "calendarAlerts") as? Bool ?? false
         reminderMinutes = d.dictionary(forKey: "reminderMinutes") as? [String: Int] ?? [ReminderKind.water.rawValue: 60]
         breakReminders = d.object(forKey: "breakReminders") as? Bool ?? true
+        breakMinutes = d.object(forKey: "breakMinutes") as? Int ?? 50
+        reactToOtherAudio = d.object(forKey: "reactToOtherAudio") as? Bool ?? false
         systemAware = d.object(forKey: "systemAware") as? Bool ?? true
     }
 }

@@ -2,7 +2,7 @@ import SwiftUI
 import AppKit
 
 enum SettingsPage: String, CaseIterable, Identifiable {
-    case pet, behavior, reminders, today, general
+    case pet, behavior, reminders, today, general, debug
 
     var id: String { rawValue }
 
@@ -13,6 +13,7 @@ enum SettingsPage: String, CaseIterable, Identifiable {
         case .reminders: return "Reminders"
         case .today: return "Today"
         case .general: return "General"
+        case .debug: return "Debug"
         }
     }
 
@@ -23,6 +24,7 @@ enum SettingsPage: String, CaseIterable, Identifiable {
         case .reminders: return "Gentle nudges while you work"
         case .today: return "Your day in numbers"
         case .general: return "Size, speech and system options"
+        case .debug: return "Test reminders and see what the pet notices"
         }
     }
 
@@ -33,6 +35,7 @@ enum SettingsPage: String, CaseIterable, Identifiable {
         case .reminders: return "bell.fill"
         case .today: return "chart.bar.fill"
         case .general: return "gearshape.fill"
+        case .debug: return "ladybug.fill"
         }
     }
 }
@@ -132,6 +135,7 @@ struct SettingsView: View {
                     case .reminders: RemindersTab(settings: settings)
                     case .today: TodayTab(log: .shared)
                     case .general: GeneralTab(settings: settings, onBringBack: onBringBack)
+                    case .debug: DebugTab(settings: settings)
                     }
                 }
                 .padding(.horizontal, 24)

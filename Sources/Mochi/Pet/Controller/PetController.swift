@@ -63,7 +63,11 @@ final class PetController {
     var hideShift: CGFloat = 0              // how far the window is slid past the edge
 
     // Two pets
-    var nextVisit = Date().addingTimeInterval(.random(in: 25...60))
+    var nextVisit = Date().addingTimeInterval(.random(in: 12...25))
+    var social = SocialPhase.none           // what this pet is doing with the other one right now
+    var socialKind = SocialKind.greet
+    var socialTimer: CGFloat = 0
+    var forcedSocial: SocialKind?           // Debug page: the next get-together must be this one
 
     // Power
     var pauseReasons = Set<String>()
@@ -223,6 +227,7 @@ final class PetController {
             }
         }
 
+        if isMain { PetDebug.shared.fire = { [weak self] a in self?.debug(a) } }
         scheduleGreeting(Date())
     }
 

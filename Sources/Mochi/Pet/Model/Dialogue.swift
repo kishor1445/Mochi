@@ -98,6 +98,17 @@ enum Dialogue {
         ["Hi \(name)!", "Tag, you're it!", "\(name)! Play with me!", "Boop!", "Best buddies! 💕"]
     }
 
+    static func calling(_ name: String) -> [String] { ["Hey \(name)!", "\(name)! Wait there!", "Coming over!"] }
+    static func comeDown(_ name: String) -> [String] { ["\(name), come down!", "Hey \(name), get down here!", "Come play, \(name)!"] }
+    static let tagStart = ["Tag! You're it!", "Can't catch me!", "Catch me if you can!"]
+    static let tagCaught = ["Got you!", "Tagged!", "Hah, caught you!"]
+    static let tagEscaped = ["Too slow!", "Never caught me!", "I win!"]
+    static let followMe = ["Follow me!", "This way!", "Come on, keep up!"]
+    static let danceTogether = ["Dance with me!", "Let's dance! 🎶", "Shake it!"]
+    static let napTogether = ["Nap buddies… 💤", "Room for one more?", "Shh… sleepy time."]
+    static let impressed = ["Whoa!", "So cool!", "Do it again!", "Show-off… 😏"]
+    static let jealous = ["Me too! Me too!", "Hey, what about me?", "My turn!"]
+
     // Outfits
     static func newOutfit(_ o: Outfit) -> String { "Ooh, I can wear a \(o.label.lowercased()) now! ✨" }
 

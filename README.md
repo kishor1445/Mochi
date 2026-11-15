@@ -45,7 +45,7 @@ Switch pets any time from the Pet tab in settings:
 
 **Plays with you (and with a friend)**
 - **Throw and bounce**: let go of the pet mid-swing and it flies, tumbles, bounces off the screen edges and lands dizzy
-- **Second pet**: turn on a companion in settings and the two run over to greet each other
+- **Second pet**: turn on a companion in settings and the two meet up to say hello, play tag, dance, follow each other, show off or nap side by side
 - **Hide and peek**: it sneaks to a screen edge, ducks behind it and pops out when your cursor comes looking
 - **Outfits**: a flower, a cap, glasses, shades, a party hat, a ninja headband, a crown and a halo unlock as your bond levels up
 - **Power moves**: every pet has a signature move. Ember breathes fire, Bolt crackles with lightning, Rex roars

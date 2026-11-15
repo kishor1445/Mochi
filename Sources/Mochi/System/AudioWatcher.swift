@@ -61,28 +61,58 @@ final class AudioWatcher {
         playing[app] = (state == "playing")
     }
 
-    /// Require a sound to last a couple of seconds so notification dings don't count.
+    /// What was found at the last poll, for the Debug page: each app making sound and how it was read.
+    private(set) var sources: [String] = []
+
+    /// A sound has to last a few seconds before it counts, so notification dings don't,
+    /// and has to be gone for a few seconds before the pet decides it stopped.
     private func poll() {
         let now = detect()
         if now == candidate { streak += 1 } else { candidate = now; streak = 1 }
-        let needed = candidate == .none ? 3 : 2
+        let needed = candidate == .none ? 4 : 3
         if candidate != current && streak >= needed { current = candidate }
     }
 
     private func detect() -> MediaActivity {
         var found = Set<MediaActivity>()
+        var seen: [String] = []
         if #available(macOS 14.2, *) {
-            for id in outputtingBundleIDs() {
-                if let kind = classify(id) { found.insert(kind) }
+            for p in audioProcesses() where p.output {
+                guard var kind = classify(p.bundleID) else {
+                    if isPausable(p.bundleID) { seen.append("\(p.bundleID): open but not playing") }
+                    continue
+                }
+                // A chat app only counts as a call while it is also using the microphone;
+                // otherwise it is just an app that happens to be making (or holding) sound.
+                if kind == .call, !p.input { kind = .other }
+                found.insert(kind)
+                seen.append("\(p.bundleID): \(Self.name(kind))")
             }
         } else if defaultOutputRunning() {
             found.insert(.other)
+            seen.append("Something is using the speakers")
         }
+        sources = seen
         if found.contains(.call) { return .call }
         if found.contains(.music) { return .music }
         if found.contains(.video) { return .video }
         if found.contains(.other) { return .other }
         return .none
+    }
+
+    static func name(_ kind: MediaActivity) -> String {
+        switch kind {
+        case .none: return "Nothing"
+        case .music: return "Music"
+        case .video: return "Video"
+        case .call: return "Call"
+        case .other: return "Other sound"
+        }
+    }
+
+    private func isPausable(_ bundleID: String) -> Bool {
+        let b = bundleID.lowercased()
+        return b.contains("spotify") || b.contains("com.apple.music") || b.contains("com.apple.itunes")
     }
 
     // MARK: Classification
@@ -112,8 +142,14 @@ final class AudioWatcher {
 
     // MARK: Core Audio
 
+    struct AudioProcess {
+        let bundleID: String
+        let output: Bool        // sending sound to the speakers
+        let input: Bool         // listening to the microphone
+    }
+
     @available(macOS 14.2, *)
-    private func outputtingBundleIDs() -> [String] {
+    private func audioProcesses() -> [AudioProcess] {
         let system = AudioObjectID(kAudioObjectSystemObject)
         var addr = AudioObjectPropertyAddress(mSelector: kAudioHardwarePropertyProcessObjectList,
                                               mScope: kAudioObjectPropertyScopeGlobal,
@@ -123,15 +159,20 @@ final class AudioWatcher {
         var ids = [AudioObjectID](repeating: 0, count: Int(size) / MemoryLayout<AudioObjectID>.size)
         guard AudioObjectGetPropertyData(system, &addr, 0, nil, &size, &ids) == noErr else { return [] }
 
-        let me = ProcessInfo.processInfo.processIdentifier
-        var result: [String] = []
-        for id in ids {
-            var running: UInt32 = 0
-            var rsize = UInt32(MemoryLayout<UInt32>.size)
-            var raddr = AudioObjectPropertyAddress(mSelector: kAudioProcessPropertyIsRunningOutput,
-                                                   mScope: kAudioObjectPropertyScopeGlobal,
+        func flag(_ id: AudioObjectID, _ selector: AudioObjectPropertySelector) -> Bool {
+            var value: UInt32 = 0
+            var vsize = UInt32(MemoryLayout<UInt32>.size)
+            var vaddr = AudioObjectPropertyAddress(mSelector: selector, mScope: kAudioObjectPropertyScopeGlobal,
                                                    mElement: kAudioObjectPropertyElementMain)
-            guard AudioObjectGetPropertyData(id, &raddr, 0, nil, &rsize, &running) == noErr, running != 0 else { continue }
+            return AudioObjectGetPropertyData(id, &vaddr, 0, nil, &vsize, &value) == noErr && value != 0
+        }
+
+        let me = ProcessInfo.processInfo.processIdentifier
+        var result: [AudioProcess] = []
+        for id in ids {
+            let output = flag(id, kAudioProcessPropertyIsRunningOutput)
+            let input = flag(id, kAudioProcessPropertyIsRunningInput)
+            guard output || input else { continue }
 
             var pid: pid_t = 0
             var psize = UInt32(MemoryLayout<pid_t>.size)
@@ -145,11 +186,11 @@ final class AudioWatcher {
             var naddr = AudioObjectPropertyAddress(mSelector: kAudioProcessPropertyBundleID,
                                                    mScope: kAudioObjectPropertyScopeGlobal,
                                                    mElement: kAudioObjectPropertyElementMain)
+            var bundle = "unknown"
             if AudioObjectGetPropertyData(id, &naddr, 0, nil, &nsize, &name) == noErr, let s = name?.takeRetainedValue() {
-                result.append(s as String)
-            } else {
-                result.append("unknown")
+                bundle = s as String
             }
+            result.append(AudioProcess(bundleID: bundle, output: output, input: input))
         }
         return result
     }

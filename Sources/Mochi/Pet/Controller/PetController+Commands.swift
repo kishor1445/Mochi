@@ -33,6 +33,7 @@ extension PetController {
         }
         action = .happy
         remaining = 1.8
+        buddy?.noticedPetting(of: self)
     }
 
     func sleepNow() {

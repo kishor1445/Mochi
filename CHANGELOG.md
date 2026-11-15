@@ -9,6 +9,11 @@
 - Settings redesigned: a sidebar of pages, a pet card with its mood, needs and actions, and grouped rows with coloured icons
 - No more emoji in the menu bar or settings: the menu bar shows a paw glyph and moods use symbols (speech bubbles, treats and toys keep theirs)
 - Smoother movement: pets ease in and out of a walk, rock and lean as they go, turn their head round instead of flipping, and squash when they land
+- Two pets now do things together: they call each other down to the ground, then say hello, play tag, dance, play follow the leader, show off or nap side by side. Pet one and the other may run over wanting some too, and they no longer stand on the same spot
+- Debug page in settings: fire any reminder on demand, watch each reminder's countdown, skip the clocks ahead, see what sound the pet detects and from which apps, and stage any two-pet meeting
+- Reminders can be set to every 10 minutes, and the stretch break has its own interval instead of a fixed 50 minutes
+- Fixed: reminders rarely fired, because every clock restarted after five minutes without input. They now keep counting while you read or watch, pause when you step away, and only start over after a 15-minute break
+- Fixed: the pet acted as if music was playing when it wasn't. Sound from browsers and other apps is ignored unless you turn on "React to other sound too", and chat apps only count as a call while they use the microphone
 - Fixed: spins, backflips and zoomies could start while hanging from the top of the screen or a wall, and an interrupted trick could leave the pet tilted
 
 ## 0.5.0

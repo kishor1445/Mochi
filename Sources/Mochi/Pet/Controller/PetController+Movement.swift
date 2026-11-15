@@ -1,6 +1,6 @@
 import AppKit
 
-/// Hide and peek, visiting the other pet, chasing and walking along surfaces.
+/// Hide and peek, chasing and walking along surfaces.
 extension PetController {
     func hideAndPeek(_ dt: CGFloat, _ f: NSRect) {
         switch hidePhase {
@@ -22,51 +22,6 @@ extension PetController {
         case .none:
             view.mood = .idle
         }
-    }
-
-    // MARK: Two pets
-
-    /// Now and then, run over to the other pet to say hi.
-    func maybeVisit(_ now: Date) {
-        guard now >= nextVisit else { return }
-        nextVisit = now.addingTimeInterval(.random(in: 45...120))
-        guard let b = buddy, canAct, b.canAct, action != .sleep, b.action != .sleep, !userAway,
-              media != .call, !focusing, treat == nil, ball == nil, b.treat == nil, b.ball == nil,
-              surface == .floor, b.surface == .floor, platform.id == b.platform.id else { return }
-        apply(Decision(action: .visit, duration: 9))
-    }
-
-    func visitBuddy(_ dt: CGFloat, _ f: NSRect) {
-        guard let b = buddy, b.surface == .floor, b.platform.id == platform.id, b.canAct else {
-            action = .idle
-            remaining = 1
-            return
-        }
-        let d = b.cx - cx
-        if abs(d) > 64 * scale {
-            facing = d > 0 ? 1 : -1
-            view.mood = .chase
-            advance(chaseSpeed * 0.85 * dt, autonomous: false, f)
-            return
-        }
-        // Met up: both are delighted.
-        facing = d > 0 ? 1 : -1
-        action = .happy
-        remaining = 2
-        view.spawnHearts(3)
-        say(Dialogue.buddyHello(b.species.name).randomElement() ?? "Hi!")
-        b.greeted(from: cx)
-        mind.reunitedWithBuddy()
-    }
-
-    /// The other pet just ran over to say hi.
-    func greeted(from x: CGFloat) {
-        guard canAct, action != .sleep else { return }
-        facing = x > cx ? 1 : -1
-        action = .happy
-        remaining = 2
-        view.spawnHearts(3)
-        nextVisit = max(nextVisit, Date().addingTimeInterval(40))
     }
 
     /// Distance from the pet to the cursor along the current surface's axis.

@@ -24,7 +24,7 @@ struct RemindersTab: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
             CardSection(title: "Gentle reminders",
-                        footer: "Reminders count time you are at your Mac, and wait while you are on a call or in a focus session.") {
+                        footer: "Reminders count time you are at your Mac, pause while you are away, and wait for calls and focus sessions to end. Test them on the Debug page.") {
                 ForEach(ReminderKind.allCases) { kind in
                     SettingRow(symbol: kind.symbol, tint: tint(kind), title: kind.label) {
                         if settings.interval(kind) != nil {
@@ -38,8 +38,16 @@ struct RemindersTab: View {
                     }
                     RowDivider()
                 }
-                ToggleRow(symbol: "figure.cooldown", tint: .orange, title: "Stretch after 50 minutes of work",
-                          isOn: $settings.breakReminders)
+                SettingRow(symbol: "figure.cooldown", tint: .orange, title: "Stretch break") {
+                    if settings.breakReminders {
+                        Picker("Every", selection: $settings.breakMinutes) {
+                            ForEach(ReminderKind.intervals, id: \.self) { Text("Every \($0) min").tag($0) }
+                        }
+                        .labelsHidden()
+                        .frame(width: 130)
+                    }
+                    Toggle("Stretch break", isOn: $settings.breakReminders).labelsHidden().toggleStyle(.switch).controlSize(.small)
+                }
             }
             CardSection(title: "Your day",
                         footer: "Calendar alerts ask macOS for access the first time. Event titles are only shown in the bubble.") {

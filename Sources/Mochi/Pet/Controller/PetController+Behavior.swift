@@ -9,6 +9,7 @@ extension PetController {
         remaining = d.duration
         forceClimb = false
         hidePhase = .none
+        social = .none
         if let line = d.line { say(line) }
         switch d.action {
         case .walk(let axis):
@@ -83,6 +84,7 @@ extension PetController {
     func maybeGreet(_ now: Date) {
         guard now >= nextGreeting else { return }
         scheduleGreeting(now)
+        if social != .none { return }               // busy with the other pet
         if settings.chattiness != .off, action != .sleep, !bubble.visible, media != .call, media != .video, !userAway, !focusing {
             apply(Decision(action: .greet, duration: 2.2))
         }
@@ -98,6 +100,7 @@ extension PetController {
         // Spin and hop are worked out fresh every frame, so an interrupted trick can never leave the pet tilted.
         var spin: CGFloat = 0
         var hop: CGFloat = 0
+        if action != .visit { social = .none }      // something else took over: the get-together is off
         switch action {
         case .idle, .leap, .climbEdge:
             view.mood = .idle

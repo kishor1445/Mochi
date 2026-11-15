@@ -15,6 +15,26 @@ if let i = args.firstIndex(of: "--render"), i + 1 < args.count {
     exit(0)
 }
 
+if args.contains("--social-test") {
+    // Developer helper: steps two pets through every get-together without waiting, and prints what happens.
+    _ = NSApplication.shared
+    let a = PetController(), b = PetController(isMain: false)
+    a.buddy = b; b.buddy = a
+    for kind in SocialKind.allCases {
+        a.cx = a.platform.minX + 200; b.cx = a.cx + 420
+        a.debug(.meet(kind))
+        var last = ""
+        for i in 0..<900 {
+            a.tick(1.0 / 30); b.tick(1.0 / 30)
+            let state = "\(a.social)/\(a.action) | \(b.social)/\(b.action)"
+            if state != last { print(String(format: "%@ t=%.1fs  %@  gap=%.0f", kind.rawValue, Double(i) / 30, state, abs(a.cx - b.cx))); last = state }
+            if i > 30, a.social == .none, b.social == .none, a.action != .visit { break }
+        }
+        a.apply(Decision(action: .idle, duration: 1)); b.apply(Decision(action: .idle, duration: 1))
+    }
+    exit(0)
+}
+
 if args.contains("--audio-test") {
     // Developer helper: prints what the audio watcher detects for ~12 seconds.
     let w = AudioWatcher.shared

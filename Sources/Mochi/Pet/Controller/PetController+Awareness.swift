@@ -22,7 +22,9 @@ extension PetController {
         }
 
         // What's playing?
-        let m = settings.reactToMedia ? audio.current : .none
+        var m = settings.reactToMedia ? audio.current : .none
+        // "Other" just means some app has the speakers open, which is often silence: opt-in only.
+        if m == .other, !settings.reactToOtherAudio { m = .none }
         if m != media { media = m; mediaChanged() }
 
         // Is anyone there?
@@ -39,15 +41,13 @@ extension PetController {
         log.tick(step, userActive: idle < 60)
 
         // Been working a long time?
-        if idle < 60 { activeSeconds += step } else if idle > 300 { activeSeconds = 0 }
-        if settings.breakReminders, activeSeconds >= 50 * 60, media != .call, focusEnds == nil {
-            activeSeconds = 0
-            lastReminder = now
-            say("You've been at it for a while. Time to stretch! 🧘", force: true)
-            if canAct { apply(Decision(action: .stretch, duration: 3)) }
+        if idle < 300 { activeSeconds += step } else if idle > 600 { activeSeconds = 0 }
+        if settings.breakReminders, activeSeconds >= TimeInterval(settings.breakMinutes * 60), remindersBlocked == nil {
+            fireStretch(now)
         }
         checkReminders(step, idle: idle, now)
         checkCalendar(now)
+        publishDebug(idle: idle, now)
 
         if settings.systemAware { checkHour(); checkBattery(now); checkLoad(now) }
         else { view.sweat = false; view.shiver = false }
@@ -142,27 +142,49 @@ extension PetController {
 
     // MARK: Gentle reminders and calendar
 
-    /// Each reminder counts time you are actually at the Mac, and waits for calls and focus sessions to end.
+    /// Why reminders are being held back right now (nil = nothing in the way).
+    var remindersBlocked: String? {
+        if media == .call { return "you're on a call" }
+        if focusEnds != nil { return "a focus session is running" }
+        if userAway { return "you're away" }
+        return nil
+    }
+
+    /// Each reminder counts the time you are at your Mac. Reading or watching without touching anything
+    /// still counts; the clock pauses once you have been gone five minutes and starts over after fifteen.
     func checkReminders(_ dt: TimeInterval, idle: TimeInterval, _ now: Date) {
-        if idle > 300 { reminderElapsed.removeAll(); return }     // you stepped away: start over
-        guard idle < 60 else { return }
+        if idle > 900 { reminderElapsed.removeAll(); return }     // a proper break: start over
+        guard idle < 300 else { return }                          // stepped away: pause
         for kind in ReminderKind.allCases {
             guard let every = settings.interval(kind) else { reminderElapsed[kind] = nil; continue }
             reminderElapsed[kind, default: 0] += dt
             guard reminderElapsed[kind, default: 0] >= TimeInterval(every * 60),
-                  now.timeIntervalSince(lastReminder) > 120,          // never two nudges back to back
-                  media != .call, focusEnds == nil, !userAway else { continue }
-            reminderElapsed[kind] = 0
-            lastReminder = now
-            say(Dialogue.reminder(kind).randomElement() ?? kind.label, force: true, seconds: 6)
-            if canAct, action != .sleep {
-                switch kind {
-                case .water: apply(Decision(action: .happy, duration: 1.6))
-                case .posture: apply(Decision(action: .stretch, duration: 2.6))
-                case .eyes: apply(Decision(action: .lookAround, duration: 3))
-                }
-            }
+                  now.timeIntervalSince(lastReminder) > 45,           // never two nudges on top of each other
+                  remindersBlocked == nil else { continue }
+            fireReminder(kind, now)
         }
+    }
+
+    /// Show a reminder now and restart its clock.
+    func fireReminder(_ kind: ReminderKind, _ now: Date = Date()) {
+        reminderElapsed[kind] = 0
+        lastReminder = now
+        if action == .sleep, canAct { action = .idle; remaining = 1 }     // wake up to say it
+        say(Dialogue.reminder(kind).randomElement() ?? kind.label, force: true, seconds: 7)
+        view.spawnHearts(1)
+        guard canAct else { return }
+        switch kind {
+        case .water: apply(Decision(action: .happy, duration: 1.6))
+        case .posture: apply(Decision(action: .stretch, duration: 2.6))
+        case .eyes: apply(Decision(action: .lookAround, duration: 3))
+        }
+    }
+
+    func fireStretch(_ now: Date = Date()) {
+        activeSeconds = 0
+        lastReminder = now
+        say("You've been at it for a while. Time to stretch! 🧘", force: true, seconds: 7)
+        if canAct { apply(Decision(action: .stretch, duration: 3)) }
     }
 
     func checkCalendar(_ now: Date) {

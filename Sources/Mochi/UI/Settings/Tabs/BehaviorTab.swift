@@ -20,6 +20,10 @@ struct BehaviorTab: View {
                 ToggleRow(symbol: "music.note", tint: .pink, title: "React to music, videos and calls",
                           subtitle: "Dances to music, settles for videos, goes quiet on calls", isOn: $settings.reactToMedia)
                 RowDivider()
+                ToggleRow(symbol: "speaker.wave.2.fill", tint: .purple, title: "React to other sound too",
+                          subtitle: "Browsers, games and other apps. Off by default: many apps hold the speakers open while silent",
+                          isOn: $settings.reactToOtherAudio)
+                RowDivider()
                 ToggleRow(symbol: "keyboard", tint: .indigo, title: "Bop along while I type",
                           isOn: $settings.reactToTyping)
                 RowDivider()
