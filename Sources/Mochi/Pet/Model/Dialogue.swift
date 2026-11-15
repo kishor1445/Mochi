@@ -71,8 +71,10 @@ enum Dialogue {
     static func power(_ s: Species) -> [String] {
         switch s {
         case .dragon: return ["FWOOOSH! 🔥", "Dragon breath!", "Too hot to handle!"]
-        case .robot: return ["Pew pew! ⚡️", "Laser mode: ON", "Maximum power!"]
-        case .dino: return ["RAAAWR!! 🦖", "Fear my mighty roar!", "ROAR! …was that scary?"]
+        case .robot: return ["Overcharge! ⚡️", "Weapons hot.", "Maximum power!"]
+        case .dino: return ["RAAAWR!! 🦖", "Fear my mighty roar!", "ROOOAR!"]
+        case .wolf: return ["AWOOOO!! 🐺", "Hear me howl!", "The hunt is on!"]
+        case .shark: return ["CHOMP!! 🦈", "Feeding frenzy!", "Jaws out!"]
         case .ghost: return ["BOO!! 👻", "Spooky power!"]
         default: return ["Ta-daa! ✨", "Special move!", "Power up! ⭐️"]
         }

@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- Tough pets: a second, rougher drawing style with angular bodies, slanted eyes under heavy brows, fangs and claws, and no rosy cheeks
+- Two new tough pets: Fang the wolf and Chomp the shark, each with its own personality, lines, snack, toy and power move
+- Rex, Bolt and Ember are redrawn in the tough style: Rex has a toothy jaw, Bolt is a battle mech with a visor and chest reactor, Ember has spread wings and slit eyes
+- The pet picker shows the five cute pets on the first row and the five tough ones on the second
+
 ## 0.5.0
 
 - Three new pets: Rex the dino, Bolt the robot and Ember the dragon, each with its own look, personality, lines, snack and toy

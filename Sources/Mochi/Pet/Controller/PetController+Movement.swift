@@ -1,0 +1,176 @@
+import AppKit
+
+/// Hide and peek, visiting the other pet, chasing and walking along surfaces.
+extension PetController {
+    func hideAndPeek(_ dt: CGFloat, _ f: NSRect) {
+        switch hidePhase {
+        case .going:
+            view.mood = .walk
+            advance(species.walkSpeed * 1.4 * dt, autonomous: true, f)   // floorEnd() ducks behind the edge
+        case .hidden:
+            view.mood = .idle
+            facing = -hideSide
+            let m = NSEvent.mouseLocation
+            // Pop out when you come looking, or when it gets bored of waiting.
+            if hypot(m.x - cx, m.y - cy) < 190 || remaining < 1.7 {
+                hidePhase = .none
+                action = .happy
+                remaining = 1.6
+                view.spawnHearts(2)
+                say(Dialogue.peekaboo.randomElement() ?? "Peekaboo!")
+            }
+        case .none:
+            view.mood = .idle
+        }
+    }
+
+    // MARK: Two pets
+
+    /// Now and then, run over to the other pet to say hi.
+    func maybeVisit(_ now: Date) {
+        guard now >= nextVisit else { return }
+        nextVisit = now.addingTimeInterval(.random(in: 45...120))
+        guard let b = buddy, canAct, b.canAct, action != .sleep, b.action != .sleep, !userAway,
+              media != .call, !focusing, treat == nil, ball == nil, b.treat == nil, b.ball == nil,
+              surface == .floor, b.surface == .floor, platform.id == b.platform.id else { return }
+        apply(Decision(action: .visit, duration: 9))
+    }
+
+    func visitBuddy(_ dt: CGFloat, _ f: NSRect) {
+        guard let b = buddy, b.surface == .floor, b.platform.id == platform.id, b.canAct else {
+            action = .idle
+            remaining = 1
+            return
+        }
+        let d = b.cx - cx
+        if abs(d) > 64 * scale {
+            facing = d > 0 ? 1 : -1
+            view.mood = .chase
+            advance(chaseSpeed * 0.85 * dt, autonomous: false, f)
+            return
+        }
+        // Met up: both are delighted.
+        facing = d > 0 ? 1 : -1
+        action = .happy
+        remaining = 2
+        view.spawnHearts(3)
+        say(Dialogue.buddyHello(b.species.name).randomElement() ?? "Hi!")
+        b.greeted(from: cx)
+        mind.reunitedWithBuddy()
+    }
+
+    /// The other pet just ran over to say hi.
+    func greeted(from x: CGFloat) {
+        guard canAct, action != .sleep else { return }
+        facing = x > cx ? 1 : -1
+        action = .happy
+        remaining = 2
+        view.spawnHearts(3)
+        nextVisit = max(nextVisit, Date().addingTimeInterval(40))
+    }
+
+    /// Distance from the pet to the cursor along the current surface's axis.
+    func cursorDelta() -> CGFloat {
+        let m = NSEvent.mouseLocation
+        switch surface {
+        case .floor, .ceiling: return m.x - cx
+        case .leftWall, .rightWall: return m.y - cy
+        case .air: return 0
+        }
+    }
+
+    func lookAtCursor() {
+        let d = cursorDelta()
+        let m = NSEvent.mouseLocation
+        if abs(d) > 40, hypot(m.x - cx, m.y - cy) < 500 {
+            facing = map(d > 0 ? 1 : -1, surface)
+        }
+    }
+
+    func chase(_ dt: CGFloat, _ f: NSRect) {
+        let d = cursorDelta()
+        if abs(d) < 28 {
+            view.mood = .idle
+            return
+        }
+        facing = map(d > 0 ? 1 : -1, surface)
+        view.mood = .chase
+        advance(chaseSpeed * dt, autonomous: false, f)
+    }
+
+    /// Move along the surface. When `autonomous`, reaching an end makes a decision
+    /// (turn around, climb the wall, hop off a window).
+    func advance(_ distance: CGFloat, autonomous: Bool, _ f: NSRect) {
+        let s = map(facing, surface)
+        switch surface {
+        case .floor, .ceiling: cx += s * distance
+        case .leftWall, .rightWall: cy += s * distance
+        case .air: return
+        }
+        if autonomous { handleEnds(f, s) }
+    }
+
+    func turnAround() { facing = -facing }
+
+    func handleEnds(_ f: NSRect, _ s: CGFloat) {
+        let was = surface
+        switch surface {
+        case .floor:
+            if cx <= platform.minX && s < 0 { floorEnd(f, left: true, s) }
+            else if cx >= platform.maxX && s > 0 { floorEnd(f, left: false, s) }
+
+        case .ceiling:
+            let left = cx <= f.minX + reach && s < 0
+            let right = cx >= f.maxX - reach && s > 0
+            if left || right {
+                if Double.random(in: 0..<1) < 0.7 {
+                    surface = left ? .leftWall : .rightWall
+                    facing = map(-1, surface)              // head down the wall
+                    snap(f)
+                } else { turnAround() }
+            }
+
+        case .leftWall, .rightWall:
+            if cy >= f.maxY - reach && s > 0 {
+                if Double.random(in: 0..<1) < 0.7 {
+                    surface = .ceiling
+                    facing = map(was == .leftWall ? 1 : -1, .ceiling)
+                    snap(f)
+                } else { turnAround() }
+            } else if cy <= f.minY + reach && s < 0 {
+                surface = .floor
+                platform = dock(f)
+                facing = map(was == .leftWall ? 1 : -1, .floor)
+                snap(f)
+            }
+
+        case .air:
+            break
+        }
+    }
+
+    func floorEnd(_ f: NSRect, left: Bool, _ s: CGFloat) {
+        if hidePhase == .going {
+            hidePhase = .hidden                             // reached the edge: duck behind it
+            remaining = .random(in: 6...10)
+            return
+        }
+        if platform.id == 0 {
+            if settings.climbEdges && (forceClimb || Double.random(in: 0..<1) < 0.5) {
+                forceClimb = false
+                surface = left ? .leftWall : .rightWall
+                facing = map(1, surface)                    // head up the wall
+                snap(f)
+                if Double.random(in: 0..<1) < 0.4 { say(Dialogue.clung.randomElement() ?? "Climbing!") }
+            } else {
+                turnAround()
+            }
+        } else if Double.random(in: 0..<1) < 0.4 {
+            surface = .air                                  // hop off the window edge
+            vy = 0
+            cx += s * 30
+        } else {
+            turnAround()
+        }
+    }
+}

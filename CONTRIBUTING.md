@@ -23,9 +23,9 @@ You need macOS 13+ and a Swift 5.9+ toolchain.
 
 ## Ideas that are easy to start with
 
-- A new pet (`Species.swift` + a drawing branch in `PetView.swift`)
-- A new trick (`PetAction` in `Brain.swift`, handled in `PetController.behave`)
-- New lines for `Dialogue.swift`
+- A new pet (`Pet/Model/Species.swift` + a drawing branch in `Pet/View/`)
+- A new trick (`PetAction` in `Brain/Brain.swift`, handled in `PetController+Behavior.swift`)
+- New lines for `Pet/Model/Dialogue.swift`
 
 ## Reporting bugs
 

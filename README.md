@@ -1,6 +1,6 @@
 # Mochi 🍡
 
-A tiny desktop pet for macOS. Pick one of eight pets and it lives on your screen: it wanders along the Dock,
+A tiny desktop pet for macOS. Pick one of ten pets, five cute and five tough, and it lives on your screen: it wanders along the Dock,
 climbs the screen edges, hangs from the top, stands on your windows, says hi, and reacts when you
 click, drag or ignore it.
 
@@ -24,9 +24,11 @@ and runs offline, but the pet's decisions go through a single `Brain` interface,
 | **Clover** 🐰 | Bouncy bunny with a pink bow whose ears flop when it sleeps. The most playful of the lot |
 | **Pip** 🐧 | Waddly, dapper penguin with a feather tuft and a red scarf who flaps when happy. Always hungry |
 | **Boo** 👻 | Floaty, friendly ghost with a wavy hem. Barely sleeps or eats |
-| **Rex** 🦖 | Stompy, brave dino with orange back plates and famously tiny arms. Always hungry, loves to roar |
-| **Bolt** 🤖 | Beepy, clever robot with a screen for a face and a blinking antenna. Curious and almost never sleeps |
-| **Ember** 🐲 | Fiery, bold dragon with little wings, horns and a flame on its tail. The most playful of all |
+| **Rex** 🦖 | Stompy, fierce dino with a big toothy jaw, heavy brows, orange head plates and famously tiny arms. Always hungry, loves to roar |
+| **Bolt** 🤖 | Armoured battle mech with a scowling visor, a glowing chest reactor and a warning light. Curious and almost never sleeps |
+| **Ember** 🐲 | Fiery, fearless dragon with spread wings, horns, slit eyes and a flame on its tail. The most playful of all |
+| **Fang** 🐺 | Lone, scarred wolf with yellow eyes and bared fangs. Curious, not cuddly, howls for its power move |
+| **Chomp** 🦈 | Shark that is all teeth, with a notched fin and flat black eyes. Barely sleeps and is always hungry |
 
 Switch pets any time from the Pet tab in settings:
 
@@ -132,39 +134,71 @@ frames, so no Screen Recording or Accessibility permission is needed.
 
 ```
 Sources/Mochi
-├── main.swift             entry point
-├── AppDelegate.swift      menu bar + right-click menu
-├── PetController.swift    window, 30fps loop, surfaces, physics, reactions
-├── Brain.swift            PetAction, Brain protocol, MindBrain (swap in AI here)
-├── Mind.swift             the pet's needs, bond and memory (saved between launches)
-├── Outfit.swift           things to wear and the bond level that unlocks each
-├── DayStats.swift         today's and yesterday's numbers for the daily check-in
-├── CalendarWatcher.swift  upcoming events (only if you turn calendar alerts on)
-├── PetView.swift          drawing for every pet and mood, mouse input
-├── Species.swift          pet definitions (colours, speed, lines)
-├── Dialogue.swift         everything the pet says
-├── SpeechBubble.swift     the speech bubble window
-├── Platform.swift         finds window tops to stand on
-├── AudioWatcher.swift     notices which apps are playing sound (music / video / call)
-├── SystemInfo.swift       idle time, battery, processor load and the key press count
-├── Treat.swift            the snack and the ball you can drop for the pet
-├── LoginItem.swift        launch at login
-├── PetSettings.swift      saved preferences (UserDefaults)
-├── SettingsView.swift     SwiftUI settings panel
-└── Render.swift           `Mochi --render out.png` writes a preview sheet
+├── App/
+│   ├── main.swift                 entry point
+│   ├── AppDelegate.swift          menu bar + right-click menu
+│   └── LoginItem.swift            launch at login
+├── Pet/
+│   ├── Controller/                the pet's window, 30fps loop and everything it does
+│   │   ├── PetController.swift    state, setup, start/stop
+│   │   ├── +Commands              treats, ball, tricks, focus sessions (menu actions)
+│   │   ├── +Tick                  the per-frame update
+│   │   ├── +Behavior              applying the brain's decisions, speech
+│   │   ├── +Movement              walking surfaces, corners, hide and peek, visiting the buddy
+│   │   ├── +Physics               falling, landing, leaping, slipping, dragging, throwing
+│   │   ├── +Geometry              screen frame, Dock, window platforms
+│   │   ├── +Awareness             media, idle, battery, load, reminders, calendar
+│   │   ├── +Input                 cursor shake / hover, typing along
+│   │   ├── +Toys                  treat and ball handling
+│   │   └── +Power                 adaptive frame rate, pause/resume
+│   ├── View/                      Core Graphics drawing for every pet and mood
+│   │   ├── PetView.swift          state, animation clock, mouse input, draw()
+│   │   ├── +Body                  body shape, squash, shading
+│   │   ├── +Parts                 ears, tails, limbs (Mochi, Miso, Clover, Pip, Boo)
+│   │   ├── +Tough                 Rex, Bolt, Ember, Fang and Chomp
+│   │   ├── +Face                  eyes, mouths, eyewear
+│   │   ├── +Outfits               things worn on the head
+│   │   ├── +Power                 power-move effects
+│   │   └── +Effects               sweat, headphones, Zs, notes, hearts
+│   └── Model/
+│       ├── Species.swift          pet definitions (colours, speed, lines)
+│       ├── Outfit.swift           things to wear and the bond level that unlocks each
+│       └── Dialogue.swift         everything the pet says
+├── Brain/
+│   ├── Brain.swift                PetAction, Brain protocol, MindBrain (swap in AI here)
+│   └── Mind.swift                 needs, bond and memory (saved between launches)
+├── System/
+│   ├── Platform.swift             finds window tops to stand on
+│   ├── AudioWatcher.swift         which apps are playing sound (music / video / call)
+│   ├── SystemInfo.swift           idle time, battery, processor load, key press count
+│   └── CalendarWatcher.swift      upcoming events (only if calendar alerts are on)
+├── Features/
+│   ├── Treat.swift                the snack and the ball you can drop
+│   └── DayStats.swift             today's and yesterday's numbers for the check-in
+├── UI/
+│   ├── SpeechBubble.swift         the speech bubble window
+│   ├── Menu/MenuHeader.swift      status card at the top of the menu
+│   ├── Components/                PetPreview, PetCard, StatusCard, Meter, StatTile
+│   └── Settings/
+│       ├── PetSettings.swift      saved preferences (UserDefaults)
+│       ├── SettingsView.swift     the tabbed settings panel
+│       ├── SettingsWindowController.swift
+│       └── Tabs/                  Pet, Behavior, Reminders, Today, General
+└── Tools/
+    └── Render.swift               `Mochi --render out.png` writes a preview sheet
 ```
 
 ## Make it your own
 
 **Add a new pet:** add a case to `Species` (name, colours, speed, lines), then add its drawing branch in
-`PetView` (body shape, limbs, face extras). Check how it looks without running the app:
+`Pet/View/` (`PetView+Body` for the shape, `+Parts`/`+Creatures` for limbs, `+Face` for face extras). Check how it looks without running the app:
 
 ```bash
 swift run Mochi --render preview.png
 ```
 
 **Add a new action:** add a case to `PetAction` in `Brain.swift`, give it a weight in `MindBrain`, and handle it in
-`PetController.behave` (and a `Mood` in `PetView` if it needs a new pose).
+`PetController.behave` (`Pet/Controller/PetController+Behavior.swift`) (and a `Mood` in `PetView` if it needs a new pose).
 
 **Add AI:** implement the `Brain` protocol:
 
