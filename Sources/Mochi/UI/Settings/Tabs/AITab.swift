@@ -66,7 +66,7 @@ struct AITab: View {
                           isOn: $settings.aiBrain)
                 RowDivider()
                 ToggleRow(symbol: "bubble.left.and.bubble.right.fill", tint: .orange, title: "Two pets talk to each other",
-                          subtitle: "A short conversation when they meet to say hello", isOn: $settings.aiBanter)
+                          subtitle: "They chat when they meet: about you, your day, what's on, or pet life", isOn: $settings.aiBanter)
                 RowDivider()
                 ToggleRow(symbol: "keyboard", tint: .blue, title: "Ask your pet",
                           subtitle: "Type a request from the menu: \u{201C}dance\u{201D}, \u{201C}remind me to drink water every 30 minutes\u{201D}, \u{201C}25 minute focus\u{201D}",

@@ -315,29 +315,97 @@ final class PetAI: ObservableObject {
 
     // MARK: 4. Two pets talking
 
-    /// Four short lines, alternating, starting with `a` (the one who ran over).
-    func banter(_ a: Species, _ b: Species, done: @escaping ([String]?) -> Void) {
+    /// What two pets talk about. Most of it is about their human.
+    enum BanterTopic: String, CaseIterable {
+        case hello, human, humanDay, now, petLife
+
+        var instruction: String {
+            switch self {
+            case .hello: return "A just ran over to say hello to B. They greet each other and chat a little."
+            case .human: return "They gossip fondly about their human: habits, likes and quirks they have noticed."
+            case .humanDay: return "They talk about how their human's day is going and what their human has been up to."
+            case .now: return "They talk about what is going on on the Mac right now."
+            case .petLife: return "They talk about their own pet life: snacks, naps, games, dreams, the view from the Dock."
+            }
+        }
+    }
+
+    /// Recent conversations, so the model doesn't write the same one twice.
+    private var recentBanter: [[String]] = []
+
+    /// What the pets know about their human for a conversation: remembered facts, today's numbers and
+    /// what happened today. Facts and happenings only when Memory is switched on.
+    func humanNotes() -> (facts: String?, today: String?) {
+        let t = DailyLog.shared.today
+        var day: [String] = []
+        if !t.isEmpty {
+            day.append("At the Mac for \(DayStats.minutes(t.activeSeconds)) so far today, typing for \(DayStats.minutes(t.typingSeconds)); "
+                + "\(t.focusSessions) focus session(s); \(t.breaks) break(s); "
+                + "\(t.treats) treat(s), \(t.pets) pet(s) and \(t.plays) ball game(s) given to the pets.")
+        }
+        if settings.aiMemory { day += memory.happenings(on: t.day).suffix(6) }
+        return (settings.aiMemory ? memory.factsForPrompt : nil,
+                day.isEmpty ? nil : day.map { "- \($0)" }.joined(separator: "\n"))
+    }
+
+    /// A topic for a chat, weighted towards the human when there is something to say about them.
+    func pickBanterTopic(now: String) -> BanterTopic {
+        let notes = humanNotes()
+        var options: [(Double, BanterTopic)] = [(1, .petLife)]
+        if notes.facts != nil { options.append((3, .human)) }
+        if notes.today != nil { options.append((3, .humanDay)) }
+        if !now.isEmpty { options.append((2, .now)) }
+        if options.count == 1 { options.append((2, .human)) }     // nothing known yet: they wonder about their human
+        var roll = Double.random(in: 0..<options.reduce(0) { $0 + $1.0 })
+        for (weight, topic) in options {
+            roll -= weight
+            if roll < 0 { return topic }
+        }
+        return .petLife
+    }
+
+    /// A short conversation, alternating, starting with `a` (the one who ran over). `now` is what is
+    /// going on on the Mac (music, a focus session…).
+    func banter(_ a: Species, _ b: Species, topic: BanterTopic = .hello, now: String = "", count: Int = 4,
+                done: @escaping ([String]?) -> Void) {
         guard on(.banter) else { done(nil); return }
-        let system = "You write tiny, charming dialogues between two desktop pets who live on someone's Mac screen."
-        let user = """
+        let notes = humanNotes()
+        let order = (0..<count).map { $0 % 2 == 0 ? "A" : "B" }.joined(separator: ", ")
+        let system = "You write tiny, charming dialogues between two desktop pets who live on someone's Mac screen and adore their human."
+        var user = """
         A is \(a.name) the \(a.rawValue) (\(a.tagline.lowercased()); \(traits(a))).
         B is \(b.name) the \(b.rawValue) (\(b.tagline.lowercased()); \(traits(b))).
-        \(situation().components(separatedBy: ". ").first ?? ""). A just ran over to B on the Dock.
-        Write a 4-line exchange: A, B, A, B. Each line at most 9 words, playful, in character, at most one emoji, \
-        no speaker names inside the lines.
-        Reply with only a JSON array of 4 strings.
+        \(situation().components(separatedBy: ". ").first ?? "").\(now.isEmpty ? "" : " " + now)
+        They are standing together on the Dock, where their human can see them.
+        """
+        if let f = notes.facts { user += "\nWhat they know about their human:\n\(f)" }
+        if let d = notes.today { user += "\nTheir human's day so far:\n\(d)" }
+        user += "\nTopic: \(topic.instruction)"
+        if let last = recentBanter.last { user += "\nDon't repeat their last chat: \(last.joined(separator: " / "))" }
+        user += """
+
+        Write a \(count)-line exchange: \(order). Each line at most \(count > 4 ? 12 : 9) words, playful, in character, \
+        at most one emoji, no speaker names inside the lines. Be warm about the human, never mean, and only mention \
+        things about the human listed above; don't invent facts about them.
+        Reply with only a JSON array of \(count) strings.
         """
         run(urgent: true, { c in
-            let reply = try await c.chat(system: system, user: user, maxTokens: 300, temperature: 1.0, urgent: true)
+            let reply = try await c.chat(system: system, user: user, maxTokens: 120 + count * 60, temperature: 1.0, urgent: true)
             var list = LLMClient.json(in: reply)
             if let dict = list as? [String: Any] { list = dict.values.first { $0 is [Any] } }
             let lines = (list as? [Any] ?? []).compactMap { $0 as? String }.compactMap { raw -> String? in
                 var s = raw
                 for label in ["A:", "B:", "\(a.name):", "\(b.name):"] where s.hasPrefix(label) { s.removeFirst(label.count) }
-                return LLMClient.line(s, limit: 70)
+                return LLMClient.line(s, limit: 90)
             }
-            return lines.count >= 2 ? Array(lines.prefix(4)) : nil
-        }, done: done)
+            return lines.count >= 2 ? Array(lines.prefix(count)) : nil
+        }, done: { [weak self] lines in
+            if let lines, let self {
+                self.recentBanter.append(lines)
+                if self.recentBanter.count > 3 { self.recentBanter.removeFirst() }
+            }
+            done(lines)
+        })
     }
 
     // MARK: 5. Typed requests

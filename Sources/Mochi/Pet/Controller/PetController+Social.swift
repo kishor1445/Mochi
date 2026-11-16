@@ -2,13 +2,14 @@ import AppKit
 
 /// What two pets can get up to together.
 enum SocialKind: String, CaseIterable, Identifiable {
-    case greet, tag, dance, follow, showOff, nap, jealous
+    case greet, chat, tag, dance, follow, showOff, nap, jealous
 
     var id: String { rawValue }
 
     var label: String {
         switch self {
         case .greet: return "Say hello"
+        case .chat: return "Have a chat"
         case .tag: return "Play tag"
         case .dance: return "Dance together"
         case .follow: return "Follow the leader"
@@ -48,8 +49,11 @@ extension PetController {
         stepAside(b)
         visitWait -= TimeInterval(dt)
         guard visitWait <= 0, social == .none else { return }
+        if chatIsStale { banterLines = nil; chatReady = nil }
         let forced = forcedSocial != nil
 
+        // The other one is already having a conversation written for the two of them: let that one lead.
+        guard !b.banterAsked, b.chatReady == nil else { visitWait = 10; return }
         guard sociable, b.canAct, !b.userAway, b.social == .none, b.treat == nil, b.ball == nil else {
             visitWait = 6
             return
@@ -77,16 +81,26 @@ extension PetController {
         }
         if forced, b.action == .sleep, forcedSocial != .nap { b.action = .idle; b.remaining = 1 }
 
+        // A chat whose words are ready goes first, unless the other one has dozed off meanwhile.
+        if chatReady != nil, forcedSocial == nil {
+            if b.action == .sleep { banterLines = nil; chatReady = nil } else { forcedSocial = .chat }
+        }
         visitWait = .random(in: 40...90)
         b.visitWait = max(b.visitWait, 20)
         let kind = forcedSocial ?? pickSocial(b)
         forcedSocial = nil
+        // The model writes the chat first; they get together once it is ready (see orderChat).
+        if kind == .chat, chatReady == nil, PetAI.shared.on(.banter) {
+            if !banterAsked { orderChat(with: b) }
+            return
+        }
         beginSocial(kind, with: b)
     }
 
     func pickSocial(_ b: PetController) -> SocialKind {
         if b.action == .sleep { return .nap }               // don't wake it: curl up next to it
         var options: [(Double, SocialKind)] = [(3, .greet), (2, .dance), (2, .follow), (2, .showOff)]
+        if PetAI.shared.on(.banter) { options.append((4, .chat)) }
         if mind.energy > 0.3 { options.append((3, .tag)) }
         if mind.energy < 0.3 || hour >= 22 || hour < 6 { options.append((4, .nap)) }
         var roll = Double.random(in: 0..<options.reduce(0) { $0 + $1.0 })
@@ -201,7 +215,7 @@ extension PetController {
         meetings += 1
         mind.reunitedWithBuddy()
         switch socialKind {
-        case .greet:
+        case .greet, .chat:
             view.spawnHearts(3)
             if startBanter(with: b) { break }           // the model wrote them a conversation
             say(Dialogue.buddyHello(b.species.name).randomElement() ?? "Hi!")

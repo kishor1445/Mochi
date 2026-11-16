@@ -96,6 +96,33 @@ enum AITest {
         }
         check("the two pets take turns saying it", heard.count == 4 && heard[0].hasPrefix(pet.species.name) && heard[1].hasPrefix(other.species.name),
               heard.joined(separator: " / "))
+
+        // A longer chat about their human: written first, then they get together and act it out.
+        PetMemory.shared.remember("Often works late at night")
+        PetMemory.shared.remember("Drinks a lot of coffee")
+        PetMemory.shared.note("Your human started a 25 minute focus session")
+        var gossip: [String]?
+        finished = false
+        ai.banter(sp, s.companionSpecies, topic: .human, count: 6) { gossip = $0; finished = true }
+        wait(90) { finished }
+        check("writes a chat about their human", (gossip?.count ?? 0) >= 4, (gossip ?? []).joined(separator: " / "))
+
+        pet.lastBanter = []
+        pet.visitWait = 0
+        pet.debug(.meet(.chat))
+        heard = []
+        let chatStop = Date().addingTimeInterval(120)
+        while Date() < chatStop, heard.count < 6 {
+            pet.tick(1.0 / 30); other.tick(1.0 / 30)
+            for p in [pet, other] where !pet.lastBanter.isEmpty && pet.lastBanter.contains(p.lastSaid) && heard.last != p.lastSaid {
+                heard.append("\(p.species.name): \(p.lastSaid)")
+                p.lastSaid = ""
+            }
+            if !pet.lastBanter.isEmpty, heard.count == pet.lastBanter.count { break }
+            RunLoop.main.run(until: Date().addingTimeInterval(1.0 / 30))
+        }
+        check("they get together for a chat and take turns", heard.count >= 4 && heard[0].hasPrefix(pet.species.name)
+              && heard[1].hasPrefix(other.species.name), heard.joined(separator: " / "))
         pet.buddy = nil; other.stop()
         s.chattiness = chat
 

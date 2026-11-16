@@ -5,6 +5,13 @@ import AppKit
 extension PetController {
     /// What the pet can tell the model about its surroundings.
     var surroundings: String {
+        var parts = happeningNow.isEmpty ? [] : [happeningNow]
+        if let b = buddy { parts.append("Your pet friend \(b.species.name) the \(b.species.rawValue) is on screen too.") }
+        return parts.joined(separator: " ")
+    }
+
+    /// What is going on on the Mac right now (music, a call, a focus session), or "".
+    var happeningNow: String {
         var parts: [String] = []
         switch media {
         case .music: parts.append("Music is playing\(soundSource).")
@@ -14,7 +21,6 @@ extension PetController {
         case .none: break
         }
         if focusing { parts.append("A focus session is running.") }
-        if let b = buddy { parts.append("Your pet friend \(b.species.name) the \(b.species.rawValue) is on screen too.") }
         return parts.joined(separator: " ")
     }
 
@@ -169,10 +175,11 @@ extension PetController {
         banterToken += 1
         banterLines = nil
         banterArrived = nil
+        chatReady = nil
         banterAsked = PetAI.shared.on(.banter)
         guard banterAsked else { return }
         let token = banterToken
-        PetAI.shared.banter(species, b.species) { [weak self, weak b] lines in
+        PetAI.shared.banter(species, b.species, topic: .hello, now: happeningNow) { [weak self, weak b] lines in
             guard let self, let b, self.banterToken == token else { return }
             self.banterAsked = false
             guard let lines else {
@@ -189,6 +196,30 @@ extension PetController {
         }
     }
 
+    /// Order a longer conversation for a chat. The pets carry on as usual meanwhile; once the words are
+    /// written, the next get-together is that chat. A slow model then never leaves them standing around.
+    func orderChat(with b: PetController) {
+        banterToken += 1
+        banterLines = nil
+        banterArrived = nil
+        chatReady = nil
+        banterAsked = true
+        let token = banterToken
+        let now = happeningNow
+        let topic = PetAI.shared.pickBanterTopic(now: now)
+        PetAI.shared.banter(species, b.species, topic: topic, now: now, count: 6) { [weak self] lines in
+            guard let self, self.banterToken == token else { return }
+            self.banterAsked = false
+            guard let lines else { return }
+            self.banterLines = lines
+            self.chatReady = Date()
+            self.visitWait = min(self.visitWait, 1)
+        }
+    }
+
+    /// A chat written more than two minutes ago is about a moment that has passed.
+    var chatIsStale: Bool { chatReady.map { Date().timeIntervalSince($0) > 120 } ?? false }
+
     /// How long two pets that just met stand together waiting for the model's conversation.
     /// Generous, so a slow local model still gets its lines in.
     static let banterWait: TimeInterval = 20
@@ -199,11 +230,14 @@ extension PetController {
         guard let lines = banterLines, !lines.isEmpty, canAct, b.canAct else { return false }
         banterLines = nil
         banterArrived = nil
+        chatReady = nil
         lastBanter = lines
         banterToken += 1
         let token = banterToken
-        let gap = 2.9
-        let total = gap * Double(lines.count) + 0.4
+        // Longer lines stay up longer, so there is time to read them.
+        let shown = lines.map { min(5.5, max(2.7, 1.4 + Double($0.count) * 0.05)) }
+        let starts = shown.indices.map { i in shown[..<i].reduce(0, +) }
+        let total = shown.reduce(0, +) + 0.4
         for pet in [self, b] {
             pet.action = .idle
             pet.remaining = total
@@ -213,7 +247,7 @@ extension PetController {
         facing = b.cx > cx ? 1 : -1
         b.facing = cx > b.cx ? 1 : -1
         for (i, line) in lines.enumerated() {
-            DispatchQueue.main.asyncAfter(deadline: .now() + gap * Double(i)) { [weak self, weak b] in
+            DispatchQueue.main.asyncAfter(deadline: .now() + starts[i]) { [weak self, weak b] in
                 guard let self, let b, self.banterToken == token, self.buddy === b else { return }
                 let speaker = i % 2 == 0 ? self : b
                 let listener = i % 2 == 0 ? b : self
@@ -221,7 +255,7 @@ extension PetController {
                 guard speaker.canAct, listener.canAct, speaker.action != .sleep, listener.action != .sleep,
                       abs(speaker.cx - listener.cx) < 160 * self.scale else { self.banterToken += 1; return }
                 listener.bubble.hide()
-                speaker.say(line, seconds: gap - 0.2)
+                speaker.say(line, seconds: shown[i] - 0.2)
                 speaker.action = .happy
                 speaker.remaining = max(speaker.remaining, 1.2)
                 if i == lines.count - 1 { speaker.view.spawnHearts(2); listener.view.spawnHearts(2) }

@@ -51,7 +51,7 @@ built-in lines and behaviour whenever the server is off or slow.
 - **Fresh lines**: the model writes new things to say for every moment (being petted, falling off a wall, a treat landing), in your pet's own voice. They are written in the background and saved, so bubbles stay instant
 - **Remarks about what's going on**: music starting in Spotify, you coming back, lunch time, a low battery, a busy Mac
 - **Decides what to do**: every few minutes the model picks the pet's next move from what it can do right now; in between, the pet follows its instincts
-- **Two pets talk**: when they meet to say hello, they have a short conversation
+- **Two pets talk**: now and then they get together for a chat, mostly about you: your habits and likes, how your day is going, what's playing, or just snacks and naps. They also chat when they meet to say hello
 - **Ask your pet**: *Ask Mochi…* in the menu opens a text box. "Dance", "25 minute focus", "remind me to drink water every 30 minutes", "put on the cap", "remember that I like lo-fi", or just a question
 - **Memory and diary**: it keeps a few facts about you and writes a short diary entry for each day, which you can read in Settings › AI
 

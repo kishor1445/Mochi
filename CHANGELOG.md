@@ -6,7 +6,7 @@
 - AI: fresh lines written by the model for every moment the pet speaks, in its own voice, generated in the background and saved
 - AI: remarks about what is going on: music or a video starting (and in which app), you coming back, the time of day, the battery, a busy Mac, the end of a focus session
 - AI: every few minutes the model chooses the pet's next move; the built-in instincts handle the rest
-- AI: two pets have a short conversation when they meet to say hello
+- AI: two pets have a short conversation when they meet to say hello, and now and then get together for a longer chat about you (what they remember, your day so far), what's going on, or pet life. The conversation is written first, so with a slow model they simply meet a little later
 - AI: "Ask Mochi…" in the menu opens a text box for requests in plain words: tricks, treats, focus sessions, reminders, outfits, size, or a question
 - AI: the pet remembers a few facts about you and writes a diary entry for each day (Settings › AI)
 - `Mochi --ai-test <server> <model>` tries every AI feature once against a server and prints what came back

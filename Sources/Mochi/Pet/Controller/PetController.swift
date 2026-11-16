@@ -80,6 +80,7 @@ final class PetController {
     var lastBanter: [String] = []           // the conversation most recently acted out
     var banterAsked = false                 // the words are still on their way
     var banterArrived: Date?                // standing together, waiting for them
+    var chatReady: Date?                    // a chat's words arrived (banterLines); walk over and have it
     var lastDiaryCheck = Date.distantPast
 
     // Power
