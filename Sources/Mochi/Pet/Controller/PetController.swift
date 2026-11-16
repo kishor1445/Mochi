@@ -77,6 +77,7 @@ final class PetController {
     // AI: a little conversation ordered while running over to the other pet
     var banterToken = 0                     // bumped whenever a conversation is ordered, started or dropped
     var banterLines: [String]?
+    var lastBanter: [String] = []           // the conversation most recently acted out
     var banterAsked = false                 // the words are still on their way
     var banterArrived: Date?                // standing together, waiting for them
     var lastDiaryCheck = Date.distantPast

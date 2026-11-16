@@ -226,7 +226,9 @@ final class PetAI: ObservableObject {
 
     /// One short line about `event`. `done(nil)` if the model takes longer than `patience` seconds
     /// (the pet then says its canned line instead; a late answer is dropped).
-    func reaction(to event: String, species s: Species, extra: String = "", patience: TimeInterval = 6,
+    /// 15 s leaves room for a local model on a laptop (a short line can take ~8 s, longer if a
+    /// background request is still running); the moment is usually still current by then.
+    func reaction(to event: String, species s: Species, extra: String = "", patience: TimeInterval = 15,
                   done: @escaping (String?) -> Void) {
         guard on(.reactions) else { done(nil); return }
         var finished = false

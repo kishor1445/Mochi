@@ -175,12 +175,23 @@ extension PetController {
         PetAI.shared.banter(species, b.species) { [weak self, weak b] lines in
             guard let self, let b, self.banterToken == token else { return }
             self.banterAsked = false
-            guard let lines else { return }
+            guard let lines else {
+                // No conversation is coming: if they are standing there waiting, let them get on with things.
+                if self.banterArrived != nil {
+                    self.banterArrived = nil
+                    for pet in [self, b] where pet.action == .idle { pet.remaining = min(pet.remaining, 1) }
+                }
+                return
+            }
             self.banterLines = lines
             // Already standing together, waiting for the words? Start talking.
-            if let at = self.banterArrived, Date().timeIntervalSince(at) < 7 { self.startBanter(with: b) }
+            if let at = self.banterArrived, Date().timeIntervalSince(at) < Self.banterWait { self.startBanter(with: b) }
         }
     }
+
+    /// How long two pets that just met stand together waiting for the model's conversation.
+    /// Generous, so a slow local model still gets its lines in.
+    static let banterWait: TimeInterval = 20
 
     /// The two pets take turns with the lines, facing each other. Returns false if there is nothing to say.
     @discardableResult
@@ -188,6 +199,7 @@ extension PetController {
         guard let lines = banterLines, !lines.isEmpty, canAct, b.canAct else { return false }
         banterLines = nil
         banterArrived = nil
+        lastBanter = lines
         banterToken += 1
         let token = banterToken
         let gap = 2.9

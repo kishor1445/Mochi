@@ -206,11 +206,14 @@ extension PetController {
             if startBanter(with: b) { break }           // the model wrote them a conversation
             say(Dialogue.buddyHello(b.species.name).randomElement() ?? "Hi!")
             if banterAsked {
-                // The words are still on their way: stand together for a few seconds and see if they come.
+                // The words are still on their way: stand together and see if they come.
                 banterArrived = Date()
                 facing = b.cx > cx ? 1 : -1
                 b.facing = cx > b.cx ? 1 : -1
-                for pet in [self, b] { pet.social = .none; pet.action = .happy; pet.remaining = 5 }
+                for pet in [self, b] {
+                    pet.social = .none; pet.action = .idle; pet.remaining = PetController.banterWait
+                    pet.visitWait = max(pet.visitWait, PetController.banterWait + 30)
+                }
             } else {
                 endSocial(cheer: true)
                 b.cheer(for: self, line: nil)

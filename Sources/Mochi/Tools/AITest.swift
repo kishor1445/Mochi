@@ -57,7 +57,7 @@ enum AITest {
         // 2. Remarks
         var said = pet.saidCount
         pet.react("Music just started playing in Spotify", fallback: "FALLBACK", force: true)
-        wait(8) { pet.saidCount > said }
+        wait(18) { pet.saidCount > said }
         check("remarks on what is going on", pet.saidCount > said && pet.lastSaid != "FALLBACK", pet.lastSaid)
 
         // 3. Choosing what to do
@@ -83,10 +83,12 @@ enum AITest {
         pet.cx = pet.platform.minX + 200; other.cx = pet.cx + 300
         pet.debug(.meet(.greet))
         var heard: [String] = []
-        let stop = Date().addingTimeInterval(25)
+        let stop = Date().addingTimeInterval(PetController.banterWait + 25)
         while Date() < stop, heard.count < 4 {
             pet.tick(1.0 / 30); other.tick(1.0 / 30)
-            for p in [pet, other] where (lines ?? []).contains(p.lastSaid) && heard.last != p.lastSaid {
+            // Each meeting asks the model afresh, so compare against what they were actually given.
+            let script = pet.lastBanter.isEmpty ? (lines ?? []) : pet.lastBanter
+            for p in [pet, other] where script.contains(p.lastSaid) && heard.last != p.lastSaid {
                 heard.append("\(p.species.name): \(p.lastSaid)")
                 p.lastSaid = ""
             }
