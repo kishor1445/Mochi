@@ -73,4 +73,5 @@ let app = NSApplication.shared
 let delegate = AppDelegate()
 app.delegate = delegate
 app.setActivationPolicy(.accessory)   // no Dock icon
+EditMenu.install()                    // copy / paste shortcuts in text fields
 app.run()
