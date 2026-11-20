@@ -6,16 +6,15 @@ struct GeneralTab: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
-            CardSection(title: "Appearance") {
-                SettingRow(symbol: "arrow.up.left.and.arrow.down.right", tint: .blue, title: "Size") {
-                    Picker("Size", selection: $settings.petSize) {
-                        ForEach(PetSize.allCases) { Text($0.label).tag($0) }
+            VStack(alignment: .leading, spacing: 9) {
+                Text("Desktop pet size").font(.headline)
+                HStack(spacing: 10) {
+                    ForEach(PetSize.allCases) { size in
+                        sizeOption(size)
                     }
-                    .pickerStyle(.segmented)
-                    .labelsHidden()
-                    .frame(width: 220)
                 }
-                RowDivider()
+            }
+            CardSection(title: "Voice") {
                 SettingRow(symbol: "bubble.left.fill", tint: .green, title: "Speech bubbles") {
                     Picker("Speech bubbles", selection: $settings.chattiness) {
                         ForEach(Chattiness.allCases) { Text($0.label).tag($0) }
@@ -41,4 +40,39 @@ struct GeneralTab: View {
             }
         }
     }
+
+    private func sizeOption(_ size: PetSize) -> some View {
+        let selected = settings.petSize == size
+        let shape = RoundedRectangle(cornerRadius: 15, style: .continuous)
+        return Button { settings.petSize = size } label: {
+            VStack(spacing: 0) {
+                ZStack(alignment: .bottom) {
+                    LinearGradient(colors: [.indigo.opacity(0.24), .cyan.opacity(0.12)],
+                                   startPoint: .topLeading, endPoint: .bottomTrailing)
+                    Capsule().fill(.primary.opacity(0.12)).frame(height: 2)
+                        .padding(.horizontal, 18).padding(.bottom, 11)
+                    PetPreview(species: settings.species, outfit: settings.outfit)
+                        .frame(width: 94 * size.scale, height: 94 * size.scale)
+                        .allowsHitTesting(false)
+                }
+                .frame(height: 94)
+                HStack {
+                    Text(size.label).font(.headline)
+                    Spacer()
+                    Image(systemName: selected ? "checkmark.circle.fill" : "circle")
+                        .foregroundStyle(selected ? Color.accentColor : Color.secondary)
+                }
+                .padding(12)
+            }
+            .background(Color(nsColor: .controlBackgroundColor))
+            .clipShape(shape)
+            .overlay(shape.strokeBorder(selected ? Color.accentColor : .primary.opacity(0.1),
+                                       lineWidth: selected ? 2 : 1))
+            .contentShape(shape)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("\(size.label) pet size")
+        .accessibilityAddTraits(selected ? .isSelected : [])
+    }
+
 }

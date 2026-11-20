@@ -25,6 +25,7 @@ final class SettingsWindowController {
             w.title = "Mochi Settings"
             w.styleMask = [.titled, .closable, .miniaturizable, .fullSizeContentView]
             w.titlebarAppearsTransparent = true
+            w.titlebarSeparatorStyle = .none
             w.titleVisibility = .hidden
             w.isMovableByWindowBackground = true
             w.setContentSize(SettingsView.size)

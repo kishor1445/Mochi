@@ -3,15 +3,51 @@ import AppKit
 
 /// Building blocks shared by every settings page: cards, rows with a coloured icon, section titles.
 
-/// A white rounded panel that groups related rows.
+/// Translucent navigation on recent systems, with a material fallback for older Macs.
+struct NavigationGlass: ViewModifier {
+    @Environment(\.accessibilityReduceTransparency) private var opaque
+
+    @ViewBuilder func body(content: Content) -> some View {
+        let shape = Rectangle()
+        if opaque {
+            content.background(Color(nsColor: .controlBackgroundColor), in: shape)
+        } else {
+            #if compiler(>=6.2)
+            if #available(macOS 26, *) {
+                content.glassEffect(.regular, in: shape)
+            } else {
+                content.background(.regularMaterial, in: shape)
+            }
+            #else
+            content.background(.regularMaterial, in: shape)
+            #endif
+        }
+    }
+}
+
+struct SettingsSurface: ViewModifier {
+    @Environment(\.accessibilityReduceTransparency) private var opaque
+    @Environment(\.colorScheme) private var scheme
+
+    func body(content: Content) -> some View {
+        let shape = RoundedRectangle(cornerRadius: 17, style: .continuous)
+        content
+            .background(Color(nsColor: .controlBackgroundColor).opacity(opaque ? 1 : 0.72), in: shape)
+            .overlay(shape.strokeBorder(
+                LinearGradient(colors: [.white.opacity(scheme == .dark ? 0.23 : 0.95), .primary.opacity(0.09)],
+                               startPoint: .topLeading, endPoint: .bottomTrailing), lineWidth: 1)
+                .allowsHitTesting(false))
+            .shadow(color: .black.opacity(0.045), radius: 7, y: 3)
+    }
+}
+
 struct Card<Content: View>: View {
     @ViewBuilder var content: Content
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) { content }
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Color(nsColor: .controlBackgroundColor)))
-            .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).stroke(Color.primary.opacity(0.08), lineWidth: 1))
+            .modifier(SettingsSurface())
     }
 }
 
@@ -124,17 +160,4 @@ struct FeelingPill: View {
             .background(Capsule().fill(tint.opacity(0.15)))
             .accessibilityLabel("Feeling \(feeling.label.lowercased())")
     }
-}
-
-/// The translucent sidebar material.
-struct SidebarBackground: NSViewRepresentable {
-    func makeNSView(context: Context) -> NSVisualEffectView {
-        let v = NSVisualEffectView()
-        v.material = .sidebar
-        v.blendingMode = .behindWindow
-        v.state = .followsWindowActiveState
-        return v
-    }
-
-    func updateNSView(_ v: NSVisualEffectView, context: Context) {}
 }
