@@ -128,6 +128,19 @@ enum LogicTest {
         a.mediaChanged()
         check("music stopping ends the vibe", !a.view.vibing && a.view.musicBpm == 0)
 
+        // Spotify playing while a Discord voice channel holds the mic: the call wins `current`, but it's still music.
+        AudioWatcher.shared.musicOn = true
+        a.media = .call
+        a.mediaChanged()
+        a.view.mood = .idle
+        check("music during a call (e.g. a Discord voice channel) still gets the vibe", a.view.vibing && a.view.musicBpm > 0)
+        check("…while the pet stays quiet for the call", !a.canSpeak(force: false))
+        AudioWatcher.shared.musicOn = false
+        a.updateBeat()
+        check("the vibe ends when that music stops", a.view.musicBpm == 0)
+        a.media = .none
+        a.mediaChanged()
+
         // MARK: Two pets
         print("--- Two pets ---")
         let b = PetController(isMain: false)

@@ -90,6 +90,7 @@ extension PetController {
         if heard != media {
             sound += settings.reactToMedia ? " (ignored: other sound is switched off in Behavior)" : " (ignored: reactions are off)"
         }
+        if audio.musicOn, heard != .music { sound += " + music" }
         d.sound = sound
         d.soundApps = audio.sources
 
@@ -98,7 +99,7 @@ extension PetController {
         if userAway { why.append("asleep because you're away") }
         if media == .call { why.append("quiet for a call") }
         if media == .video { why.append("watching a video") }
-        if media == .music || media == .other { why.append("vibing to the music") }
+        if view.musicBpm > 0 { why.append("vibing to the music") }
         if focusing { why.append("calm for a focus session") }
         if mind.energy < 0.25 { why.append("tired") }
         if mind.fullness < 0.2 { why.append("hungry") }

@@ -21,6 +21,12 @@ final class AudioWatcher {
     private var streak = 0
     private var timer: Timer?
 
+    /// A music player is playing, whatever else is going on. `current` reports only the loudest kind
+    /// of sound (a call beats music), but sitting in a Discord voice channel with Spotify on is still
+    /// music to vibe to. Debounced like `current`. Settable so the logic test can fake it.
+    var musicOn = false
+    private var musicStreak = 0
+
     /// Real play/pause state for apps that keep their audio stream open while paused (Spotify, Music).
     /// They announce changes system-wide, which needs no permission.
     private var playing: [String: Bool] = [:]
@@ -67,13 +73,28 @@ final class AudioWatcher {
     /// A sound has to last a few seconds before it counts, so notification dings don't,
     /// and has to be gone for a few seconds before the pet decides it stopped.
     private func poll() {
-        let now = detect()
+        let found = detect()
+        let now = Self.loudest(found)
         if now == candidate { streak += 1 } else { candidate = now; streak = 1 }
         let needed = candidate == .none ? 4 : 3
         if candidate != current && streak >= needed { current = candidate }
+
+        // Same debounce for "is music playing at all": 3 s to start, 4 s to stop.
+        let music = found.contains(.music)
+        musicStreak = music == musicOn ? 0 : musicStreak + 1
+        if musicStreak >= (music ? 3 : 4) { musicOn = music; musicStreak = 0 }
     }
 
-    private func detect() -> MediaActivity {
+    /// Calls beat music, music beats video, video beats anything else.
+    private static func loudest(_ found: Set<MediaActivity>) -> MediaActivity {
+        if found.contains(.call) { return .call }
+        if found.contains(.music) { return .music }
+        if found.contains(.video) { return .video }
+        if found.contains(.other) { return .other }
+        return .none
+    }
+
+    private func detect() -> Set<MediaActivity> {
         var found = Set<MediaActivity>()
         var seen: [String] = []
         if #available(macOS 14.2, *) {
@@ -93,11 +114,7 @@ final class AudioWatcher {
             seen.append("Something is using the speakers")
         }
         sources = seen
-        if found.contains(.call) { return .call }
-        if found.contains(.music) { return .music }
-        if found.contains(.video) { return .video }
-        if found.contains(.other) { return .other }
-        return .none
+        return found
     }
 
     static func name(_ kind: MediaActivity) -> String {

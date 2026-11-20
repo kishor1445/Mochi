@@ -27,6 +27,7 @@ extension PetController {
         if m == .other, !settings.reactToOtherAudio { m = .none }
         if m == .call, !settings.quietOnCalls { m = .none }
         if m != media { media = m; mediaChanged() }
+        updateBeat()
 
         // Is anyone there?
         let idle = SystemInfo.userIdleSeconds()
@@ -58,7 +59,6 @@ extension PetController {
     func mediaChanged() {
         switch media {
         case .music, .other:
-            view.musicBpm = .random(in: 100...126)
             if !isMain {}
             else if media == .music { react("Music just started playing\(soundSource)", fallback: "Ooh, music! 🎵", note: true) }
             else if Bool.random() { say("Something's playing… 🎧") }
@@ -66,16 +66,33 @@ extension PetController {
             // grooving to the beat (see PetView.vibing). Standing about, it gives a happy little bounce first.
             if canAct, !userAway, action == .idle || action == .lookAround { apply(Decision(action: .happy, duration: 1.6)) }
         case .video:
-            view.musicBpm = 0
             if isMain { react("Your human started watching a video\(soundSource)", fallback: "Movie time! 🍿", note: true) }
             if canAct, !userAway { apply(Decision(action: .idle, duration: 5)) }
         case .call:
-            view.musicBpm = 0
             if isMain { say("Shh… I'll be quiet 🤫", force: true) }
             if canAct, !userAway { apply(Decision(action: .idle, duration: 5)) }
         case .none:
-            if view.musicBpm > 0, isMain { react("The music you were vibing to just stopped", fallback: "Aww, the music stopped 🥲") }
+            break
+        }
+        updateBeat()
+    }
+
+    /// Whether the pet should be vibing: headphones on and grooving to the beat.
+    /// Music counts even during a call (say, a Discord voice channel with Spotify playing): the vibe is
+    /// only visual, and the pet still keeps quiet for the call.
+    var hearsMusic: Bool {
+        media == .music || media == .other || (settings.reactToMedia && audio.musicOn && media != .video)
+    }
+
+    /// Switches the vibe on or off when the music starts or stops.
+    func updateBeat() {
+        let on = hearsMusic
+        guard on != (view.musicBpm > 0) else { return }
+        if on {
+            view.musicBpm = .random(in: 100...126)
+        } else {
             view.musicBpm = 0
+            if isMain, media == .none { react("The music you were vibing to just stopped", fallback: "Aww, the music stopped 🥲") }
         }
     }
 
