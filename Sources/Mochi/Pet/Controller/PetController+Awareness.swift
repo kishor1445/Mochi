@@ -62,7 +62,9 @@ extension PetController {
             if !isMain {}
             else if media == .music { react("Music just started playing\(soundSource)", fallback: "Ooh, music! 🎵", note: true) }
             else if Bool.random() { say("Something's playing… 🎧") }
-            if canAct, !userAway { apply(Decision(action: .dance, duration: 7)) }
+            // No stopping to dance: the headphones go on and it carries on with whatever it was doing,
+            // grooving to the beat (see PetView.vibing). Standing about, it gives a happy little bounce first.
+            if canAct, !userAway, action == .idle || action == .lookAround { apply(Decision(action: .happy, duration: 1.6)) }
         case .video:
             view.musicBpm = 0
             if isMain { react("Your human started watching a video\(soundSource)", fallback: "Movie time! 🍿", note: true) }
@@ -72,7 +74,7 @@ extension PetController {
             if isMain { say("Shh… I'll be quiet 🤫", force: true) }
             if canAct, !userAway { apply(Decision(action: .idle, duration: 5)) }
         case .none:
-            if view.musicBpm > 0, isMain { react("The music you were dancing to just stopped", fallback: "Aww, the music stopped 🥲") }
+            if view.musicBpm > 0, isMain { react("The music you were vibing to just stopped", fallback: "Aww, the music stopped 🥲") }
             view.musicBpm = 0
         }
     }

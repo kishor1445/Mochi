@@ -81,7 +81,7 @@ keystrokes, your screen or your calendar.
 - **Several displays**: hops across to the next display, follows your cursor there, and can be dragged anywhere
 
 **Reacts to what is happening on your Mac** (no special permissions)
-- **Music** (Spotify, Apple Music, ...): puts on headphones, bobs to the beat and dances, but only while music is actually playing (a paused Spotify doesn't count; it learns the state at the next play, pause or track change)
+- **Music** (Spotify, Apple Music, ...): puts on headphones and vibes along while it carries on as usual: it walks in step with the beat, grooves side to side, taps its feet, sometimes closes its eyes to enjoy the song, and now and then breaks into a proper dance. Only while music is actually playing (a paused Spotify doesn't count; it learns the state at the next play, pause or track change)
 - **Videos** (QuickTime, VLC, IINA, ...): settles down to watch ("Movie time! 🍿")
 - **Calls** (Zoom, Teams, FaceTime, Discord, ...): goes quiet and still
 - **Anything else making sound** (browsers, etc.): bobs along and sometimes dances

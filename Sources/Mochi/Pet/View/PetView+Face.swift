@@ -29,7 +29,7 @@ extension PetView {
         }
 
         // Rosy cheeks
-        sp.accent.withAlphaComponent(mood == .happy || mood == .dance ? 0.85 : 0.6).setFill()
+        sp.accent.withAlphaComponent(mood == .happy || mood == .dance || lostInMusic ? 0.85 : 0.6).setFill()
         for dx in [CGFloat(-1), 1] {
             NSBezierPath(ovalIn: NSRect(x: fx + dx * (spread + 8) - 5.5, y: eyeY - 10.5, width: 11, height: 6.5)).fill()
         }
@@ -38,7 +38,7 @@ extension PetView {
         ink.setFill(); ink.setStroke()
         for dx in [CGFloat(-1), 1] {
             let ex = fx + dx * spread
-            switch mood {
+            switch lostInMusic ? .happy : mood {     // eyes closed, enjoying the song
             case .sleep, .stretch:
                 arc(NSPoint(x: ex, y: eyeY + 2), 4.6, 200, 340, width: 2.3)
             case .happy, .dance:

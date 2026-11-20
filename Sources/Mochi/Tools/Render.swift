@@ -32,7 +32,8 @@ enum Render {
         }
         for (i, sp) in Species.allCases.enumerated() {
             let v = PetView(frame: NSRect(origin: .zero, size: PetView.size))
-            v.species = sp; v.mood = .idle; v.musicBpm = 120; v.time = 0.45
+            // Vibing to music; every other pet is caught lost in the song (eyes closed, see PetView.lostInMusic).
+            v.species = sp; v.mood = .idle; v.musicBpm = 120; v.time = i.isMultiple(of: 2) ? 0.45 : 7.1
             let rep = v.bitmapImageRepForCachingDisplay(in: v.bounds)!
             v.cacheDisplay(in: v.bounds, to: rep)
             let img = NSImage(size: v.bounds.size); img.addRepresentation(rep)

@@ -113,7 +113,8 @@ extension PetView {
             for s in [CGFloat(-1), 1] {
                 var ang: CGFloat = sin(time * 2 + s) * 0.06
                 switch mood {
-                case .walk, .chase: ang = sin(time * 10 + (s < 0 ? 0 : .pi)) * 0.3
+                case .walk, .chase: ang = sin(time * walkRate + (s < 0 ? 0 : .pi)) * 0.3
+                case .idle where vibing: ang = 0.3 + abs(sin(beatPhase)) * 0.4
                 case .happy, .dance, .jump, .power: ang = 1.0 + sin(time * 14) * 0.3
                 case .held: ang = 0.9 + sin(time * 20) * 0.35
                 case .stretch: ang = 1.2
@@ -273,7 +274,8 @@ extension PetView {
         let sp = species
         guard sp != .shark else { return }
         // clawed feet that stomp
-        let step: CGFloat = (mood == .walk || mood == .chase) ? sin(time * (mood == .chase ? 14 : 10)) : 0
+        var step: CGFloat = (mood == .walk || mood == .chase) ? sin(time * (mood == .chase ? 14 : walkRate)) : 0
+        if vibing, mood != .walk { step = sin(beatPhase) * 0.8 }      // stomping to the beat
         for (i, dx) in ([-1, 1] as [CGFloat]).enumerated() {
             let up = max(0, i == 0 ? step : -step) * 4
             let r = NSRect(x: b.midX + dx * b.width * 0.21 - 9.5, y: b.minY - 3 + up, width: 19, height: 9)
@@ -466,7 +468,7 @@ extension PetView {
             let ex = fx + dx * spread
             var brow: (NSPoint, NSPoint)? = (NSPoint(x: ex + dx * 9.5, y: eyeY + 9.5), NSPoint(x: ex - dx * 7, y: eyeY + 2.5))
             sp.ink.setStroke(); sp.ink.setFill()
-            switch mood {
+            switch lostInMusic ? .happy : mood {     // a fierce grin, feeling the song
             case .sleep, .stretch:
                 let lid = NSBezierPath()
                 lid.move(to: NSPoint(x: ex + dx * 6, y: eyeY + 1)); lid.line(to: NSPoint(x: ex - dx * 5, y: eyeY - 2))

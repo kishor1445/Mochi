@@ -9,7 +9,7 @@ extension PetView {
         var lift: CGFloat = 0
 
         switch mood {
-        case .walk:  let s = abs(sin(t * 10)); lift = s * 6 * sp.hopFactor;  squash = 1 - 0.05 * s
+        case .walk:  let s = abs(sin(t * walkRate)); lift = s * 6 * sp.hopFactor;  squash = 1 - 0.05 * s
         case .chase: let s = abs(sin(t * 14)); lift = s * 9 * sp.hopFactor;  squash = 1 - 0.07 * s
         case .happy: lift = abs(sin(t * 9)) * 16; squash = 1.05
         case .sleep: squash = 1 + 0.06 * sin(t * 1.4)
@@ -23,10 +23,12 @@ extension PetView {
         case .idle:  break
         }
         // Bob to the beat while music plays.
-        if musicBpm > 0, mood == .idle || mood == .walk || mood == .chase {
-            let beat = abs(sin(t * .pi * musicBpm / 60))
-            lift += beat * 4
-            squash -= beat * 0.04
+        if musicBpm > 0, mood == .idle || mood == .walk || mood == .chase || mood == .sad {
+            let beat = abs(sin(beatPhase))
+            // Standing still it really feels it; on the move it's a lighter bounce on top of the steps.
+            let groove: CGFloat = mood == .idle ? 5 : (mood == .sad ? 2 : 3)
+            lift += beat * groove
+            squash -= beat * groove * 0.01
         }
         // A quick bop for every key you press.
         if tap > 0, mood == .idle || mood == .walk || mood == .sad {
