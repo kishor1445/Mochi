@@ -285,7 +285,7 @@ final class PetAI: ObservableObject {
         }
         let media: String
         switch ctx.media {
-        case .music: media = " Music is playing."
+        case .music: media = " Music is playing: you vibe along to it whatever you do, so there's no need to dance all the time."
         case .video: media = " Your human is watching a video."
         case .other: media = " Some sound is playing."
         default: media = ""

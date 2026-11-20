@@ -3,7 +3,8 @@ import AppKit
 /// Ears, tails, limbs and markings for Mochi, Miso, Clover, Pip and Boo.
 extension PetView {
     func drawFeet(_ body: NSRect) {
-        let step: CGFloat = (mood == .walk || mood == .chase) ? sin(time * (mood == .chase ? 14 : 10)) : 0
+        var step: CGFloat = (mood == .walk || mood == .chase) ? sin(time * (mood == .chase ? 14 : walkRate)) : 0
+        if vibing, mood != .walk { step = sin(beatPhase) * 0.8 }      // tapping its feet to the beat
         let wide: CGFloat = species == .penguin ? 17 : 14
         for (i, dx) in ([-1, 1] as [CGFloat]).enumerated() {
             let up = max(0, i == 0 ? step : -step) * 4
@@ -116,7 +117,7 @@ extension PetView {
             let outward: CGFloat = u < 0 ? 1 : -1       // CCW is positive rotation: left ear leans left
             var rot = outward * 0.14
             switch mood {
-            case .walk, .chase: rot += facing * 0.3 + sin(time * 10 + u) * 0.08
+            case .walk, .chase: rot += facing * 0.3 + sin(time * walkRate + u) * 0.08
             case .sleep:        rot = outward * 1.15
             case .happy, .dance: rot += sin(time * 9) * 0.12
             case .held:         rot += outward * 0.4
@@ -201,12 +202,13 @@ extension PetView {
         for side in [CGFloat(-1), 1] {
             var ang = side * 0.3
             switch mood {
-            case .walk, .chase: ang += sin(time * 10 + (side < 0 ? 0 : .pi)) * 0.28
+            case .walk, .chase: ang += sin(time * walkRate + (side < 0 ? 0 : .pi)) * 0.28
             case .happy, .dance, .jump, .power: ang = side * (2.2 + sin(time * 14) * 0.35)
             case .stretch: ang = side * 2.6
             case .held: ang = side * (2.0 + sin(time * 20) * 0.4)
             case .sleep: ang = side * 0.12
             case .dizzy: ang = side * (1.0 + sin(time * 12) * 0.3)
+            case .idle where vibing: ang = side * (0.5 + abs(sin(beatPhase)) * 0.45)    // flapping to the beat
             case .idle: ang += sin(time * 2 + side) * 0.04
             case .sad: ang = side * 0.1
             }
@@ -224,6 +226,7 @@ extension PetView {
             case .held: ang = side * (2.0 + sin(time * 20) * 0.4)
             case .dizzy: ang = side * (1.2 + sin(time * 12) * 0.4)
             case .walk, .chase: ang += sin(time * 8 + side) * 0.2
+            case .idle where vibing: ang = side * (1.1 + sin(beatPhase + side) * 0.35)     // waving along
             default: ang += sin(time * 2.4 + side) * 0.1
             }
             let pivot = NSPoint(x: body.midX + side * (body.width / 2 - 2), y: body.minY + body.height * 0.42)

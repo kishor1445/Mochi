@@ -104,6 +104,43 @@ enum LogicTest {
         check("never leaves the screen", offscreen == 0)
         check("ends upright", abs(a.view.spin) < 0.01 || a.action == .spin || a.action == .flip || a.action == .dizzy)
 
+        // MARK: Music
+        print("--- Music: moving as usual while vibing ---")
+        let brain = MindBrain()
+        let ctx = PetContext(surface: .floor, axisFraction: 0.5, cursorDistance: 900, secondsSinceInteraction: 60, hour: 14,
+                             platformAbove: false, canClimb: true, canHide: false, media: .music, userAway: false, focusing: false,
+                             species: a.species, energy: 0.7, fullness: 0.7, joy: 0.6, bondLevel: 1)
+        var picks: [String: Int] = [:]
+        for _ in 0..<2000 { picks[String(describing: brain.nextDecision(ctx).action).components(separatedBy: "(")[0], default: 0] += 1 }
+        let danceShare = Double(picks["dance"] ?? 0) / 2000
+        print("with music on: " + picks.sorted { $0.value > $1.value }.map { "\($0.key) \($0.value)" }.joined(separator: ", "))
+        check("with music on it mostly carries on as usual (dances under 30% of the time)", danceShare < 0.3, String(format: "%.0f%% dance", danceShare * 100))
+        check("with music on it still walks about the most", picks["walk", default: 0] == picks.values.max())
+        check("with music on it still breaks into a dance now and then", danceShare > 0.05, String(format: "%.0f%% dance", danceShare * 100))
+
+        a.apply(Decision(action: .walk(axis: 1), duration: 5))
+        a.media = .music
+        a.mediaChanged()
+        check("music starting doesn't interrupt a walk with a dance", { if case .walk = a.action { return true }; return false }(), "\(a.action)")
+        a.view.mood = .walk
+        check("walking with music on counts as vibing", a.view.vibing && a.view.musicBpm > 0)
+        a.media = .none
+        a.mediaChanged()
+        check("music stopping ends the vibe", !a.view.vibing && a.view.musicBpm == 0)
+
+        // Spotify playing while a Discord voice channel holds the mic: the call wins `current`, but it's still music.
+        AudioWatcher.shared.musicOn = true
+        a.media = .call
+        a.mediaChanged()
+        a.view.mood = .idle
+        check("music during a call (e.g. a Discord voice channel) still gets the vibe", a.view.vibing && a.view.musicBpm > 0)
+        check("…while the pet stays quiet for the call", !a.canSpeak(force: false))
+        AudioWatcher.shared.musicOn = false
+        a.updateBeat()
+        check("the vibe ends when that music stops", a.view.musicBpm == 0)
+        a.media = .none
+        a.mediaChanged()
+
         // MARK: Two pets
         print("--- Two pets ---")
         let b = PetController(isMain: false)

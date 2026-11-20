@@ -60,8 +60,10 @@ if args.contains("--audio-test") {
     let w = AudioWatcher.shared
     w.start()
     var last: MediaActivity? = nil
+    var lastMusic: Bool? = nil
     let t = Timer(timeInterval: 0.5, repeats: true) { _ in
         if w.current != last { last = w.current; print("media:", w.current) }
+        if w.musicOn != lastMusic { lastMusic = w.musicOn; print("music playing (vibe):", w.musicOn ? "yes" : "no") }
         print("  apps:", w.sources.isEmpty ? "none using the speakers" : w.sources.joined(separator: "; "))
     }
     RunLoop.main.add(t, forMode: .common)

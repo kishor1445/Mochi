@@ -104,15 +104,9 @@ final class MindBrain: Brain {
                 o = [(9, d(.idle, 5, 10)), (2, d(.lookAround, 2, 3)), (1, d(.stretch, 2, 3))]
                 if drowsy || tired { o.append((3, d(.sleep, 10, 20))) }
 
-            case .music, .other:
-                let fan: Double = ctx.media == .music ? 9 : 4
-                o = [(fan, d(.dance, 6, 10)), (3, d(.idle, 2, 4)), (4, d(.walk(axis: axis), 2, 6)),
-                     (2, d(.happy, 1.5, 2)), (1.5, d(.spin, 0.9, 0.9)), (1, d(.zoomies, 3, 4)),
-                 (1.5, d(.flip, 0.8, 0.8)), (1, d(.power, 2.2, 2.2))]
-                if ctx.cursorDistance < 500 { o.append((2, d(.chase, 3, 6))) }
-                if tired { o.append((2, d(.sleep, 10, 20))) }
-
-            case .none, .call:
+            case .none, .call, .music, .other:
+                // Music doesn't change what it does, only how: it goes about its usual day while vibing
+                // to the beat (PetView draws the groove), and now and then breaks into a proper dance.
                 if ctx.surface == .floor || ctx.surface == .air {
                     o = [(4, d(.idle, 2, 5)), (10, d(.walk(axis: axis), 2, 7)), (1.5, d(.happy, 1.5, 1.5)),
                          (2, d(.stretch, 2.4, 2.4)), (1.5, d(.spin, 0.9, 0.9)), (1.5, d(.dance, 4, 4)),
@@ -125,6 +119,9 @@ final class MindBrain: Brain {
                 }
                 if ctx.cursorDistance < 500 { o.append((4, d(.chase, 3, 6))) }
                 if drowsy { o.append((3, d(.sleep, 8, 20))) } else if tired { o.append((3, d(.sleep, 15, 30))) }
+                if ctx.media == .music || ctx.media == .other, ctx.surface == .floor {
+                    o.append((ctx.media == .music ? 2.5 : 1, d(.dance, 4, 7)))
+                }
             }
 
             if ctx.platformAbove && ctx.surface == .floor {

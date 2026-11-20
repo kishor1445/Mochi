@@ -40,6 +40,23 @@ final class PetView: NSView {
     var dragged = false
     var previewTimer: Timer?
 
+    // MARK: Vibing to music
+
+    /// Music is playing and the pet is going about its business (standing, walking, sulking):
+    /// instead of stopping to dance, it grooves along to the beat.
+    var vibing: Bool { musicBpm > 0 && (mood == .idle || mood == .walk || mood == .sad) }
+
+    /// Angular speed of the walk cycle. While music plays the footsteps follow the tempo
+    /// (two steps per beat, about the normal pace at 100–126 bpm).
+    var walkRate: CGFloat { musicBpm > 0 ? 2 * .pi * musicBpm / 60 : 10 }
+
+    /// Phase of the music: `abs(sin(beatPhase))` peaks once per beat, `sin(beatPhase)` swings
+    /// left and right over two beats.
+    var beatPhase: CGFloat { time * .pi * musicBpm / 60 }
+
+    /// Every so often a vibing pet closes its eyes and gets lost in the song for a few seconds.
+    var lostInMusic: Bool { vibing && mood != .sad && fmod(time, 9) > 6 }
+
     override var isFlipped: Bool { false }
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
     override func hitTest(_ point: NSPoint) -> NSView? { isPreview ? nil : super.hitTest(point) }
@@ -123,8 +140,10 @@ final class PetView: NSView {
             // Rock from foot to foot and lean into the walk; tough pets stomp, the penguin waddles.
             let rock: CGFloat = species == .penguin ? 0.12 : (species.style == .tough ? 0.06 : 0.035)
             let lean: CGFloat = mood == .chase ? 0.10 : 0.04
-            sway = sin(time * (mood == .chase ? 14 : 10)) * rock - facing * lean
+            sway = sin(time * (mood == .chase ? 14 : walkRate)) * rock - facing * lean
         }
+        // Grooving along: a gentle side-to-side sway in time with the music.
+        if vibing { sway += sin(beatPhase) * (mood == .walk ? 0.05 : 0.08) }
         if sway != 0 {
             ctx.translateBy(x: Self.canvas.midX, y: 8)
             ctx.rotate(by: sway)

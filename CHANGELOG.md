@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Music: the pet no longer drops everything to dance when Spotify, Apple Music or another player starts. It keeps walking, climbing and exploring as usual while vibing to the beat: footsteps in time with the music, a side-to-side groove, foot taps and waving arms when it stands still, and a few seconds with its eyes closed, lost in the song. It still breaks into a proper dance now and then. Music playing during a call (for example Spotify while you sit in a Discord voice channel) gets the vibe too; the pet just stays quiet for the call
+
 - AI (optional): connect any OpenAI-compatible server in Settings › AI, local (Ollama, LM Studio, llama.cpp) or hosted. The API key is kept in the keychain, and the pet falls back to its built-in lines and behaviour whenever the server is off or slow
 - AI: fresh lines written by the model for every moment the pet speaks, in its own voice, generated in the background and saved
 - AI: remarks about what is going on: music or a video starting (and in which app), you coming back, the time of day, the battery, a busy Mac, the end of a focus session
