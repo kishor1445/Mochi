@@ -14,10 +14,9 @@ struct StatTile: View {
                 Text(label).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             }
         }
-        .frame(maxWidth: .infinity, minHeight: 92, alignment: .topLeading)
+        .frame(maxWidth: .infinity, minHeight: 70, alignment: .topLeading)
         .padding(12)
-        .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Color(nsColor: .controlBackgroundColor)))
-        .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).stroke(Color.primary.opacity(0.08), lineWidth: 1))
+        .modifier(SettingsSurface())
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("\(label): \(value)")
     }

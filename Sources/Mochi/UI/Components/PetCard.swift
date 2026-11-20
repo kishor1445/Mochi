@@ -23,8 +23,5 @@ struct PetCard: View {
                 .stroke(selected ? Color.accentColor : Color.clear, lineWidth: 2)
         )
         .contentShape(RoundedRectangle(cornerRadius: 10))
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel("\(species.name), \(species.tagline)")
-        .accessibilityAddTraits(selected ? [.isButton, .isSelected] : .isButton)
     }
 }

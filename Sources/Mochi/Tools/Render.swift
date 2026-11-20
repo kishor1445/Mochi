@@ -67,6 +67,7 @@ extension Render {
         let s = PetSettings.shared
         for page in SettingsPage.allCases {
             let view = SettingsView(settings: s, onSayHi: {}, onBringBack: {}, onTreat: {}, onPlay: {}, nav: SettingsNav(page))
+                .frame(width: SettingsView.size.width, height: SettingsView.size.height)
             snapshot(view, to: page == .pet ? path : path.replacingOccurrences(of: ".png", with: "-\(page.rawValue).png"))
         }
         snapshot(MenuHeader(mind: .shared, species: s.species), to: path.replacingOccurrences(of: ".png", with: "-menu.png"))

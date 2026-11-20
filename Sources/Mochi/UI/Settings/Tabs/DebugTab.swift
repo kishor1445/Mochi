@@ -16,63 +16,121 @@ struct DebugTab: View {
         }
     }
 
+    private enum Pane: String, CaseIterable {
+        case reminders = "Reminder tests", activity = "Live readings", meetings = "Pet meetings"
+    }
+
+    @State private var pane: Pane = .reminders
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            CardSection(title: "Reminders",
-                        footer: "Test shows the reminder straight away, even if it is switched off. Skip ahead moves every clock forward, so you can watch a real one come due.") {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(spacing: 16) {
+                Image(systemName: "waveform.path.ecg.rectangle")
+                    .font(.system(size: 34, weight: .light))
+                    .accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 5) {
+                    Text("\(settings.species.name)’s activity").font(.headline)
+                    Text(debug.petState.isEmpty ? "Waiting for a reading…" : debug.petState)
+                        .font(.system(.callout, design: .monospaced))
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer()
+                PetPreview(species: settings.species, outfit: settings.outfit)
+                    .frame(width: 64, height: 64)
+                    .accessibilityHidden(true)
+            }
+            .padding(.horizontal, 18).padding(.vertical, 8)
+            .foregroundStyle(.white)
+            .background(LinearGradient(colors: [Color(red: 0.12, green: 0.23, blue: 0.32),
+                                                 Color(red: 0.17, green: 0.39, blue: 0.42)],
+                                       startPoint: .leading, endPoint: .trailing),
+                        in: RoundedRectangle(cornerRadius: 16))
+
+            Picker("Debug tools", selection: $pane) {
+                ForEach(Pane.allCases, id: \.self) { Text($0.rawValue).tag($0) }
+            }
+            .pickerStyle(.segmented).labelsHidden()
+            switch pane {
+            case .reminders: reminderTests
+            case .activity: readings
+            case .meetings: meetings
+            }
+        }
+    }
+
+    private var reminderTests: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
                 ForEach(ReminderKind.allCases) { kind in
-                    SettingRow(symbol: kind.symbol, tint: tint(kind), title: kind.label,
-                               subtitle: debug.reminders[kind.rawValue] ?? "…") {
-                        Button("Test") { fire(.reminder(kind)) }
-                    }
-                    RowDivider()
+                    testButton(kind.label, detail: debug.reminders[kind.rawValue] ?? "Waiting…",
+                               symbol: kind.symbol, color: tint(kind), action: .reminder(kind))
                 }
-                SettingRow(symbol: "figure.cooldown", tint: .orange, title: "Stretch break",
-                           subtitle: debug.reminders["stretch"] ?? "…") {
-                    Button("Test") { fire(.stretch) }
-                }
-                RowDivider()
-                SettingRow(symbol: "calendar", tint: .red, title: "Calendar alert", subtitle: "A made-up event, 5 minutes away") {
-                    Button("Test") { fire(.calendar) }
-                }
-                RowDivider()
-                SettingRow(symbol: "chart.bar.fill", tint: .indigo, title: "Daily check-in", subtitle: "Today so far") {
-                    Button("Test") { fire(.checkIn) }
-                }
-                RowDivider()
-                SettingRow(symbol: "forward.fill", tint: .gray, title: "Skip ahead", subtitle: debug.reminderState) {
+                testButton("Stretch break", detail: debug.reminders["stretch"] ?? "Waiting…",
+                           symbol: "figure.cooldown", color: .orange, action: .stretch)
+                testButton("Calendar alert", detail: "Sample event in 5 minutes",
+                           symbol: "calendar", color: .red, action: .calendar)
+                testButton("Daily check-in", detail: "Today’s recap", symbol: "chart.bar.fill",
+                           color: .indigo, action: .checkIn)
+            }
+            Text("Run any test to show its reminder immediately, even when switched off.")
+                .font(.caption).foregroundStyle(.secondary)
+            CardSection(title: "Reminder clocks", footer: "Advance all enabled timers to test a scheduled reminder.") {
+                SettingRow(symbol: "forward.fill", tint: .teal, title: "Skip ahead", subtitle: debug.reminderState) {
                     Button("5 min") { fire(.skip(minutes: 5)) }
                     Button("15 min") { fire(.skip(minutes: 15)) }
                 }
             }
+        }
+    }
 
-            CardSection(title: "What the pet notices") {
-                SettingRow(symbol: "person.fill", tint: .blue, title: "You", subtitle: debug.presence) { EmptyView() }
-                RowDivider()
-                SettingRow(symbol: "speaker.wave.2.fill", tint: .pink, title: "Sound: \(debug.sound)",
-                           subtitle: debug.soundApps.isEmpty ? "No app is using the speakers" : debug.soundApps.joined(separator: "\n")) {
-                    EmptyView()
+    private func testButton(_ title: String, detail: String, symbol: String, color: Color,
+                            action: DebugAction) -> some View {
+        Button { fire(action) } label: {
+            HStack(spacing: 10) {
+                IconBadge(symbol: symbol, tint: color)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(title).font(.headline)
+                    Text(detail).font(.caption).foregroundStyle(.secondary)
+                }
+                Spacer()
+                Image(systemName: "play.fill").font(.caption).foregroundStyle(color)
+            }
+            .padding(12)
+            .frame(maxWidth: .infinity, minHeight: 62)
+            .modifier(SettingsSurface())
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Test " + title)
+        .accessibilityValue(detail)
+    }
+
+    private var readings: some View {
+        CardSection(title: "What your pet notices") {
+            SettingRow(symbol: "person.fill", tint: .blue, title: "Presence", subtitle: debug.presence) { EmptyView() }
+            RowDivider()
+            SettingRow(symbol: "speaker.wave.2.fill", tint: .pink,
+                       title: debug.sound.isEmpty ? "Sound" : "Sound: \(debug.sound)",
+                       subtitle: debug.soundApps.isEmpty ? "No app is using the speakers" : debug.soundApps.joined(separator: "\n")) {
+                EmptyView()
+            }
+            RowDivider()
+            SettingRow(symbol: "display.2", tint: .teal, title: "Displays", subtitle: debug.screens) {
+                Button("Send to next display") { fire(.nextScreen) }
+                    .disabled(NSScreen.screens.count < 2)
+            }
+        }
+    }
+
+    private var meetings: some View {
+        CardSection(title: "Two pets", footer: debug.pets) {
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 3), spacing: 8) {
+                ForEach(SocialKind.allCases) { kind in
+                    Button { fire(.meet(kind)) } label: { Text(kind.label).frame(maxWidth: .infinity) }
                 }
             }
-
-            CardSection(title: "Right now") {
-                SettingRow(symbol: "pawprint.fill", tint: .orange, title: "Doing", subtitle: debug.petState) { EmptyView() }
-                RowDivider()
-                SettingRow(symbol: "display.2", tint: .teal, title: "Displays", subtitle: debug.screens) {
-                    Button("Send to next display") { fire(.nextScreen) }
-                        .disabled(NSScreen.screens.count < 2)
-                }
-            }
-
-            CardSection(title: "Two pets", footer: debug.pets) {
-                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 3), spacing: 8) {
-                    ForEach(SocialKind.allCases) { kind in
-                        Button { fire(.meet(kind)) } label: { Text(kind.label).frame(maxWidth: .infinity) }
-                    }
-                }
-                .padding(12)
-                .disabled(!settings.secondPet)
-            }
+            .padding(12)
+            .disabled(!settings.secondPet)
         }
     }
 }
