@@ -83,7 +83,7 @@ extension PetController {
             return
         }
         stillFor += TimeInterval(dt)
-        let excused = userAway || focusing || media == .video || mind.energy < 0.08
+        let excused = userAway || focusing || media.isWatching || mind.energy < 0.08
             || social != .none || hidePhase != .none || treat != nil || ball != nil || slipTimer > 0
         guard !excused, stillFor > (action == .sleep ? 90 : 40) else { return }
         stillFor = 0
@@ -109,7 +109,7 @@ extension PetController {
         guard now >= nextGreeting else { return }
         scheduleGreeting(now)
         if social != .none { return }               // busy with the other pet
-        if settings.chattiness != .off, action != .sleep, !bubble.visible, media != .call, media != .video, !userAway, !focusing {
+        if settings.chattiness != .off, action != .sleep, !bubble.visible, !onCall, !media.isWatching, !userAway, !focusing {
             apply(Decision(action: .greet, duration: 2.2))
         }
     }
@@ -117,7 +117,8 @@ extension PetController {
     /// Whether a bubble would be shown right now.
     func canSpeak(force: Bool) -> Bool {
         if force { return true }
-        return settings.chattiness != .off && media != .call && !focusing     // quiet during calls and focus sessions
+        // Quiet during calls, films and focus sessions.
+        return settings.chattiness != .off && !onCall && media != .movie && !focusing
     }
 
     func say(_ text: String, force: Bool = false, seconds: TimeInterval = 3.6) {
@@ -206,6 +207,7 @@ extension PetController {
                           canClimb: surface == .floor && platform.id == 0 && settings.climbEdges,
                           canHide: surface == .floor && platform.id == 0 && NSScreen.screens.count == 1,
                           media: media,
+                          onCall: onCall,
                           userAway: userAway,
                           focusing: focusing,
                           species: species,

@@ -52,7 +52,43 @@ enum Render {
             img.draw(at: NSPoint(x: CGFloat(i) * cell, y: 2 * cell), from: .zero, operation: .sourceOver, fraction: 1)
         }
         sheet.unlockFocus()
-        if let tiff = sheet.tiffRepresentation, let rep = NSBitmapImageRep(data: tiff),
+        write(sheet, to: path)
+        media(to: path.replacingOccurrences(of: ".png", with: "-media.png"))
+    }
+
+    /// One sheet per kind of media (…-music.png, …-podcast.png, …-video.png, …-movie.png): a row per act,
+    /// a column per pet. Each column is caught at a different moment, so the animations show mid-move.
+    static func media(to path: String) {
+        let pets = Species.allCases
+        let cell = PetView.side
+        for kind in [MediaActivity.music, .podcast, .video, .movie, .other] {
+            // `.other` stands in for the private-window acts (…-private.png).
+            let acts = kind == .other ? MediaAct.privacy : MediaAct.acts(for: kind)
+            let sheet = NSImage(size: NSSize(width: cell * CGFloat(pets.count), height: cell * CGFloat(acts.count)))
+            sheet.lockFocus()
+            NSColor(calibratedWhite: 0.93, alpha: 1).setFill()
+            NSRect(origin: .zero, size: sheet.size).fill()
+            for (row, act) in acts.enumerated() {
+                for (col, sp) in pets.enumerated() {
+                    let v = PetView(frame: NSRect(origin: .zero, size: PetView.size))
+                    v.species = sp; v.mood = .idle; v.facing = col.isMultiple(of: 3) ? -1 : 1; v.act = act
+                    v.musicBpm = kind == .music ? 116 : 0
+                    v.time = 0.55 + CGFloat(col) * 0.83 + CGFloat(row) * 0.37
+                    let rep = v.bitmapImageRepForCachingDisplay(in: v.bounds)!
+                    v.cacheDisplay(in: v.bounds, to: rep)
+                    let img = NSImage(size: v.bounds.size); img.addRepresentation(rep)
+                    img.draw(at: NSPoint(x: CGFloat(col) * cell, y: sheet.size.height - cell * CGFloat(row + 1)),
+                             from: .zero, operation: .sourceOver, fraction: 1)
+                }
+            }
+            sheet.unlockFocus()
+            let name = kind == .other ? "private" : (kind == .movie ? "movie" : AudioWatcher.name(kind).lowercased())
+            write(sheet, to: path.replacingOccurrences(of: "-media.png", with: "-\(name).png"))
+        }
+    }
+
+    private static func write(_ image: NSImage, to path: String) {
+        if let tiff = image.tiffRepresentation, let rep = NSBitmapImageRep(data: tiff),
            let png = rep.representation(using: .png, properties: [:]) {
             try? png.write(to: URL(fileURLWithPath: path))
         }

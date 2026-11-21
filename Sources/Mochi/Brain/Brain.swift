@@ -44,6 +44,7 @@ struct PetContext {
     let canClimb: Bool                 // on the Dock floor with climbing enabled
     let canHide: Bool                  // on the Dock floor with a screen edge to duck behind
     let media: MediaActivity           // what is playing on the Mac
+    var onCall = false                 // a call is on: keep quiet
     let userAway: Bool                 // nobody has touched the Mac for a while
     let focusing: Bool                 // a focus session is running: keep calm
     let species: Species
@@ -75,7 +76,9 @@ final class MindBrain: Brain {
         let hungry = ctx.fullness < 0.2
         let lonely = ctx.joy < 0.25
         let joyful = ctx.joy > 0.7
-        let quiet = ctx.media == .call || ctx.focusing
+        // On a call it keeps quiet, but if something is on screen it still watches along (the watching
+        // branches below are calm and still anyway).
+        let quiet = ctx.focusing || (ctx.onCall && !ctx.media.isWatching)
 
         // Running on empty: nothing else matters until it has had a nap.
         if ctx.energy < 0.08 {
@@ -99,16 +102,30 @@ final class MindBrain: Brain {
             if drowsy || tired { o.append((3, d(.sleep, 10, 20))) }
         } else {
             switch ctx.media {
+            case .movie:
+                // A film or a show: 3D glasses on, popcorn in hand, and hardly a move until it's over.
+                o = [(14, d(.idle, 8, 14)), (1, d(.lookAround, 2, 3)), (0.5, d(.stretch, 2.4, 2.4))]
+                if drowsy || tired { o.append((3, d(.sleep, 20, 40))) }
+
             case .video:
-                // Watching along.
-                o = [(9, d(.idle, 5, 10)), (2, d(.lookAround, 2, 3)), (1, d(.stretch, 2, 3))]
+                // Watching along, now and then shifting about or giggling (see mediaTick).
+                o = [(9, d(.idle, 5, 10)), (2, d(.lookAround, 2, 3)), (1, d(.stretch, 2, 3)), (1.5, d(.walk(axis: axis), 1.5, 3))]
                 if drowsy || tired { o.append((3, d(.sleep, 10, 20))) }
+
+            case .podcast:
+                // Listening: calm, pottering about and nodding along, no dancing or zoomies.
+                o = [(8, d(.idle, 4, 8)), (6, d(.walk(axis: axis), 2, 5)), (2.5, d(.lookAround, 2, 3)),
+                     (1, d(.stretch, 2.4, 2.4))]
+                if ctx.cursorDistance < 500 { o.append((2, d(.chase, 3, 5))) }
+                if drowsy || tired { o.append((3, d(.sleep, 10, 25))) }
 
             case .none, .call, .music, .other:
                 // Music doesn't change what it does, only how: it goes about its usual day while vibing
                 // to the beat (PetView draws the groove), and now and then breaks into a proper dance.
                 if ctx.surface == .floor || ctx.surface == .air {
-                    o = [(4, d(.idle, 2, 5)), (10, d(.walk(axis: axis), 2, 7)), (1.5, d(.happy, 1.5, 1.5)),
+                    // With music on it stops to perform (DJ, bongos…) more often, but still walks the most.
+                    let perform = ctx.media == .music
+                    o = [(perform ? 8 : 4, d(.idle, perform ? 4 : 2, perform ? 9 : 5)), (10, d(.walk(axis: axis), 2, 7)), (1.5, d(.happy, 1.5, 1.5)),
                          (2, d(.stretch, 2.4, 2.4)), (1.5, d(.spin, 0.9, 0.9)), (1.5, d(.dance, 4, 4)),
                          (2.5, d(.lookAround, 3, 3)), (1.5, d(.zoomies, 3.5, 3.5)),
                      (1.2, d(.power, 2.2, 2.2)), (1.2, d(.flip, 0.8, 0.8))]
@@ -124,13 +141,13 @@ final class MindBrain: Brain {
                 }
             }
 
-            if ctx.platformAbove && ctx.surface == .floor {
+            if ctx.platformAbove && ctx.surface == .floor && !ctx.media.isWatching {
                 o.append((3, Decision(action: .leap, duration: 2)))
             }
-            if ctx.canHide && ctx.media != .video {
+            if ctx.canHide && !ctx.media.isWatching {
                 o.append((1.6, d(.hide, 14, 16)))
             }
-            if ctx.canClimb && ctx.media != .video {
+            if ctx.canClimb && !ctx.media.isWatching {
                 o.append((3.5, d(.climbEdge, 10, 14)))
             }
             // Unmet needs: sit and sulk, and now and then say what's wrong.

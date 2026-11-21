@@ -40,7 +40,7 @@ extension PetController {
 
     /// Free to start something with the other pet.
     var sociable: Bool {
-        canAct && action != .sleep && !userAway && media != .call && !focusing && treat == nil && ball == nil
+        canAct && action != .sleep && !userAway && !onCall && !focusing && treat == nil && ball == nil
             && slipTimer <= 0 && hidePhase == .none
     }
 

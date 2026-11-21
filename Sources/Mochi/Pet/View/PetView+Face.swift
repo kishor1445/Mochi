@@ -3,6 +3,7 @@ import AppKit
 /// Eyes, cheeks, mouths and eyewear, plus small drawing helpers.
 extension PetView {
     func drawFace(_ body: NSRect) {
+        if hidesFace { return }                 // turned around, giving you some privacy
         let sp = species
         if sp.style == .tough { drawToughFace(body); return }
         let ink = sp.ink
@@ -151,6 +152,9 @@ extension PetView {
 
     /// Shades and glasses sit over the eyes, so they are drawn with the face.
     func drawEyewear(fx: CGFloat, spread: CGFloat, eyeY: CGFloat) {
+        // Watching a film: 3D glasses go on over anything else.
+        // 3D glasses for a film go on over anything else; tears and the screen's reflection go with the eyes.
+        if drawActEyes(fx: fx, spread: spread, eyeY: eyeY) { return }
         if outfit == .shades {
             let dark = NSColor(calibratedRed: 0.10, green: 0.10, blue: 0.14, alpha: 1)
             for dx in [CGFloat(-1), 1] {

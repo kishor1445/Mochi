@@ -113,7 +113,12 @@ final class PetController {
     var lastClick = Date.distantPast
 
     // Awareness
-    var media: MediaActivity = .none
+    var media: MediaActivity = .none        // what's playing, as far as the settings let the pet care
+    var onCall = false                      // a call is on (and "Stay quiet during calls" is on): keep quiet
+    var playingTitle: String?               // the song or show last reacted to, so a new one is noticed
+    var nextMediaMoment = Date.distantFuture   // the next little reaction to a podcast or video
+    var nextActChange = Date.distantFuture     // when it switches to another act for what's playing (MediaAct)
+    var privately = false                   // what's playing is in a private window: look away, remember nothing
     var userAway = false
     var activeSeconds: TimeInterval = 0
     var lastSlow = Date.distantPast
@@ -177,6 +182,12 @@ final class PetController {
         window.hidesOnDeactivate = false
         window.contentView = view
         window.isReleasedWhenClosed = false
+
+        // Music starting or stopping reaches the pet at once, not at its next once-a-second look around.
+        NotificationCenter.default.addObserver(forName: .mochiMediaChanged, object: nil, queue: .main) { [weak self] _ in
+            guard let self, self.timer != nil else { return }
+            self.refreshMedia()
+        }
 
         // Swiping between Spaces shuffles every window's position: pause window tracking until it settles.
         NSWorkspace.shared.notificationCenter.addObserver(

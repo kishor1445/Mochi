@@ -56,18 +56,25 @@ if args.contains("--screens-test") {
 }
 
 if args.contains("--audio-test") {
-    // Developer helper: prints what the audio watcher detects for ~12 seconds.
+    // Developer helper: prints what the audio watcher detects (for 12 seconds, or `--audio-test 60`).
     let w = AudioWatcher.shared
     w.start()
+    let seconds = args.firstIndex(of: "--audio-test").flatMap { args.indices.contains($0 + 1) ? Double(args[$0 + 1]) : nil } ?? 12
+    let began = Date()
+    func stamp() -> String { String(format: "%5.1fs", Date().timeIntervalSince(began)) }
     var last: MediaActivity? = nil
-    var lastMusic: Bool? = nil
-    let t = Timer(timeInterval: 0.5, repeats: true) { _ in
-        if w.current != last { last = w.current; print("media:", w.current) }
-        if w.musicOn != lastMusic { lastMusic = w.musicOn; print("music playing (vibe):", w.musicOn ? "yes" : "no") }
-        print("  apps:", w.sources.isEmpty ? "none using the speakers" : w.sources.joined(separator: "; "))
+    var lastCall: Bool? = nil
+    var lastSources: [String] = []
+    NotificationCenter.default.addObserver(forName: .mochiMediaChanged, object: nil, queue: .main) { _ in
+        if w.current != last { last = w.current; print(stamp(), "media:", AudioWatcher.name(w.current)) }
+        if w.onCall != lastCall { lastCall = w.onCall; print(stamp(), "on a call:", w.onCall ? "yes" : "no") }
+    }
+    let t = Timer(timeInterval: 0.25, repeats: true) { _ in
+        if w.sources != lastSources { lastSources = w.sources; print(stamp(), "  heard:", w.sources.isEmpty ? "nothing" : w.sources.joined(separator: "; ")) }
     }
     RunLoop.main.add(t, forMode: .common)
-    RunLoop.main.run(until: Date().addingTimeInterval(12))
+    print(stamp(), "media:", AudioWatcher.name(w.current), "(watching for \(Int(seconds))s; play, pause or dictate now)")
+    RunLoop.main.run(until: Date().addingTimeInterval(seconds))
     exit(0)
 }
 

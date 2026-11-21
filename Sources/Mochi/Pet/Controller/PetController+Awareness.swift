@@ -1,6 +1,6 @@
 import AppKit
 
-/// Once-a-second awareness: needs, media, idle, battery, load, reminders and calendar.
+/// Once-a-second awareness: needs, idle, battery, load, reminders and calendar (sound is in +Media).
 extension PetController {
     func slowTick(_ now: Date) {
         let elapsed = now.timeIntervalSince(lastSlow)
@@ -21,13 +21,8 @@ extension PetController {
             if let end = focusEnds, now >= end { finishFocus() }
         }
 
-        // What's playing?
-        var m = settings.reactToMedia ? audio.current : .none
-        // "Other" just means some app has the speakers open, which is often silence: opt-in only.
-        if m == .other, !settings.reactToOtherAudio { m = .none }
-        if m == .call, !settings.quietOnCalls { m = .none }
-        if m != media { media = m; mediaChanged() }
-        updateBeat()
+        refreshMedia()
+        mediaTick(now)
 
         // Is anyone there?
         let idle = SystemInfo.userIdleSeconds()
@@ -54,46 +49,6 @@ extension PetController {
 
         if settings.systemAware { checkHour(); checkBattery(now); checkLoad(now) }
         else { view.sweat = false; view.shiver = false }
-    }
-
-    func mediaChanged() {
-        switch media {
-        case .music, .other:
-            if !isMain {}
-            else if media == .music { react("Music just started playing\(soundSource)", fallback: "Ooh, music! 🎵", note: true) }
-            else if Bool.random() { say("Something's playing… 🎧") }
-            // No stopping to dance: the headphones go on and it carries on with whatever it was doing,
-            // grooving to the beat (see PetView.vibing). Standing about, it gives a happy little bounce first.
-            if canAct, !userAway, action == .idle || action == .lookAround { apply(Decision(action: .happy, duration: 1.6)) }
-        case .video:
-            if isMain { react("Your human started watching a video\(soundSource)", fallback: "Movie time! 🍿", note: true) }
-            if canAct, !userAway { apply(Decision(action: .idle, duration: 5)) }
-        case .call:
-            if isMain { say("Shh… I'll be quiet 🤫", force: true) }
-            if canAct, !userAway { apply(Decision(action: .idle, duration: 5)) }
-        case .none:
-            break
-        }
-        updateBeat()
-    }
-
-    /// Whether the pet should be vibing: headphones on and grooving to the beat.
-    /// Music counts even during a call (say, a Discord voice channel with Spotify playing): the vibe is
-    /// only visual, and the pet still keeps quiet for the call.
-    var hearsMusic: Bool {
-        media == .music || media == .other || (settings.reactToMedia && audio.musicOn && media != .video)
-    }
-
-    /// Switches the vibe on or off when the music starts or stops.
-    func updateBeat() {
-        let on = hearsMusic
-        guard on != (view.musicBpm > 0) else { return }
-        if on {
-            view.musicBpm = .random(in: 100...126)
-        } else {
-            view.musicBpm = 0
-            if isMain, media == .none { react("The music you were vibing to just stopped", fallback: "Aww, the music stopped 🥲") }
-        }
     }
 
     func welcomeBack() {
@@ -167,7 +122,7 @@ extension PetController {
 
     /// Why reminders are being held back right now (nil = nothing in the way).
     var remindersBlocked: String? {
-        if media == .call { return "you're on a call" }
+        if onCall { return "you're on a call" }
         if focusEnds != nil { return "a focus session is running" }
         if userAway { return "you're away" }
         return nil
@@ -177,7 +132,7 @@ extension PetController {
     /// too, but only five minutes: a bubble is silent, and some people sit in a voice channel for hours.
     func mayRemind(overdue: TimeInterval) -> Bool {
         guard overdue >= 0, focusEnds == nil, !userAway else { return false }
-        return media != .call || overdue >= 300
+        return !onCall || overdue >= 300
     }
 
     /// Each reminder counts the time you are at your Mac. Reading or watching without touching anything

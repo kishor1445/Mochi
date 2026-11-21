@@ -81,14 +81,38 @@ keystrokes, your screen or your calendar.
 - **Several displays**: hops across to the next display, follows your cursor there, and can be dragged anywhere
 
 **Reacts to what is happening on your Mac** (no special permissions)
-- **Music** (Spotify, Apple Music, ...): puts on headphones and vibes along while it carries on as usual: it walks in step with the beat, grooves side to side, taps its feet, sometimes closes its eyes to enjoy the song, and now and then breaks into a proper dance. Only while music is actually playing (a paused Spotify doesn't count; it learns the state at the next play, pause or track change)
-- **Videos** (QuickTime, VLC, IINA, ...): settles down to watch ("Movie time! 🍿")
-- **Calls** (Zoom, Teams, FaceTime, Discord, ...): goes quiet and still
-- **Anything else making sound** (browsers, etc.): bobs along and sometimes dances
+- **Whatever is playing**, from what your Mac shows as Now Playing (the media controls in Control Center): it starts within a moment of you pressing play, stops within a second of pausing, and isn't fooled by apps that just keep the speakers open, like dictation tools or an idle browser tab. For each kind of thing the pet has five acts; it picks one when something starts and switches every few minutes (and sometimes on a new song), so it never looks the same for long:
+  - **Music** (Spotify, Apple Music, YouTube Music, a music video, ...): DJ at a turntable, air guitar, karaoke with eyes closed for the big notes, a glow-stick rave with the colours washing over it, or bongos. It vibes along to the beat whatever it's doing, and now and then breaks into a proper dance
+  - **Podcasts and audiobooks**: one earbud in nodding along, taking notes (with the odd bright idea 💡), a coffee break, a little retro radio it leans in to, or deep thinking with a "?" turning into a "!". Calm, no dancing
+  - **Videos** (YouTube and other sites): binge-watching on a phone, a bowl of chips, holding up a big 👍, pressing SUBSCRIBE and ringing the bell, or typing comments on a laptop ("first!"). The screen's light flickers on its face and is reflected in its eyes, and it giggles now and then
+  - **Films and shows** (Netflix, Prime Video, the TV app, IINA, ...): 3D glasses and popcorn, wrapped up in a blanket, soda and nachos, hiding behind a cushion at the scary bits, or a tearjerker with tissues. Quiet and still until the credits
+- **Calls** (Zoom, Teams, FaceTime, Discord, ...): goes quiet, but keeps watching or listening along to whatever is playing
+- **Anything else making sound** (games, etc.): only if your Mac can't report Now Playing and you switch on "React to other audio"
 - **Typing**: bops along with every key you press and cheers when you're on a roll or typing fast. It only reads the system's running count of key presses, never which keys
 - Falls asleep when you step away, and welcomes you back when you return
 - **Busy Mac**: sweats when the processor is flat out or the Mac runs hot, and shivers when the battery is nearly empty
 - Comments on low battery, plugging in and mealtimes
+
+<details>
+<summary>See every act on every pet</summary>
+
+**Music**: DJ, air guitar, karaoke, glow-stick rave, bongos
+
+![Music acts](docs/acts-music.png)
+
+**Podcasts and audiobooks**: earbud nodder, note-taker, coffee break, retro radio, deep thinker
+
+![Podcast acts](docs/acts-podcast.png)
+
+**Videos**: phone binge, snack attack, smash that like, subscribe bell, comment typer
+
+![Video acts](docs/acts-video.png)
+
+**Films and shows**: 3D cinema, blanket burrito, soda and nachos, scary scene, tearjerker
+
+![Film acts](docs/acts-movie.png)
+
+</details>
 
 **Interacts with you**
 - Eyes follow your cursor; it sometimes chases it and looks at you when you are near
@@ -164,7 +188,8 @@ Sources/Mochi
 │   │   ├── +Movement              walking surfaces, corners, hide and peek, visiting the buddy
 │   │   ├── +Physics               falling, landing, leaping, slipping, dragging, throwing
 │   │   ├── +Geometry              screen frame, Dock, window platforms
-│   │   ├── +Awareness             media, idle, battery, load, reminders, calendar
+│   │   ├── +Awareness             idle, battery, load, reminders, calendar
+│   │   ├── +Media                 reacting to music, podcasts, videos, films and calls
 │   │   ├── +AI                    remarks, typed requests, two-pet conversations
 │   │   ├── +Input                 cursor shake / hover, typing along
 │   │   ├── +Toys                  treat and ball handling
@@ -177,11 +202,16 @@ Sources/Mochi
 │   │   ├── +Face                  eyes, mouths, eyewear
 │   │   ├── +Outfits               things worn on the head
 │   │   ├── +Power                 power-move effects
-│   │   └── +Effects               sweat, headphones, Zs, notes, hearts
+│   │   ├── +Effects               sweat, headphones, Zs, notes, hearts
+│   │   ├── +Media                 the screen's glow and its reflection in the eyes
+│   │   └── Acts/                  the 20 things it does while something plays: +ActKit (shared helpers),
+│   │                              +MusicActs, +PodcastActs, +VideoActs, +MovieActs
 │   └── Model/
 │       ├── Species.swift          pet definitions (colours, speed, lines)
 │       ├── Outfit.swift           things to wear and the bond level that unlocks each
-│       └── Dialogue.swift         everything the pet says
+│       ├── MediaAct.swift         the acts for each kind of media, and how one is picked
+│       ├── Dialogue.swift         everything the pet says
+│       └── Dialogue+Media.swift   what it says about songs, podcasts, videos and films
 ├── Brain/
 │   ├── Brain.swift                PetAction, Brain protocol, MindBrain (the built-in instincts)
 │   └── Mind.swift                 needs, bond and memory (saved between launches)
@@ -192,7 +222,9 @@ Sources/Mochi
 │   └── PetMemory.swift            remembered facts and the diary (Application Support/Mochi)
 ├── System/
 │   ├── Platform.swift             finds window tops to stand on
-│   ├── AudioWatcher.swift         which apps are playing sound (music / video / call)
+│   ├── AudioWatcher.swift         what kind of sound is playing (music / video / call)
+│   ├── NowPlaying.swift           what the system's Now Playing says is playing, and whether it's paused
+│   ├── MediaClassifier.swift      is it a song, a podcast, a film or a video?
 │   ├── SystemInfo.swift           idle time, battery, processor load, key press count
 │   └── CalendarWatcher.swift      upcoming events (only if calendar alerts are on)
 ├── Features/

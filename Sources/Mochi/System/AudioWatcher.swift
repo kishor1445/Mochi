@@ -4,32 +4,45 @@ import CoreAudio
 /// What kind of sound is playing on the Mac right now.
 enum MediaActivity: Equatable {
     case none
-    case music      // Music, Spotify, ...
-    case video      // QuickTime, VLC, IINA, ...
-    case call       // Zoom, Teams, FaceTime, Discord, ...
-    case other      // browsers and everything else
+    case music      // a song: Spotify, Apple Music, YouTube Music…
+    case podcast    // a podcast or an audiobook
+    case video      // YouTube and other clips
+    case movie      // a film or a show: Netflix, Prime Video, the TV app, IINA…
+    case call       // Zoom, Teams, FaceTime, Discord: only inside the watcher, reported as `onCall`
+    case other      // an app with the speakers open (only when Now Playing can't be read)
+
+    /// Something with pictures that the pet sits down to watch.
+    var isWatching: Bool { self == .video || self == .movie }
 }
 
-/// Notices which apps are playing audio, using Core Audio's process list.
-/// This needs no permission and never hears the audio itself, it only sees that an app is outputting sound.
+extension Notification.Name {
+    /// Posted by `AudioWatcher` when `current` or `onCall` changes, so the pets react at once.
+    static let mochiMediaChanged = Notification.Name("MochiMediaChanged")
+}
+
+/// Works out what kind of sound is playing on the Mac. Needs no permission and never hears the audio.
+///
+/// Music and videos come from the system's Now Playing (`NowPlaying`): the player itself says whether it is
+/// playing, so pausing is noticed within a second, and apps that merely hold the speakers open (dictation
+/// tools, chat apps, an idle browser tab) don't count. Calls come from Core Audio's process list: a chat app
+/// that is using the microphone. If Now Playing can't be read, everything comes from that process list,
+/// as before.
 final class AudioWatcher {
     /// One watcher for the whole app, however many pets are on screen.
     static let shared = AudioWatcher()
     private var started = false
+    /// What is playing (music, a podcast, a video, a film…), whether or not you are also on a call.
     private(set) var current: MediaActivity = .none
-    private var candidate: MediaActivity = .none
-    private var streak = 0
+    /// A chat app is using the microphone (Zoom, Discord, FaceTime…). Kept apart from `current`, so a
+    /// YouTube video watched while sitting in a Discord voice channel is still a video, just a quiet one.
+    private(set) var onCall = false
     private var timer: Timer?
 
-    /// A music player is playing, whatever else is going on. `current` reports only the loudest kind
-    /// of sound (a call beats music), but sitting in a Discord voice channel with Spotify on is still
-    /// music to vibe to. Debounced like `current`. Settable so the logic test can fake it.
-    var musicOn = false
-    private var musicStreak = 0
-
-    /// Real play/pause state for apps that keep their audio stream open while paused (Spotify, Music).
-    /// They announce changes system-wide, which needs no permission.
+    /// Real play/pause state for apps that keep their audio stream open while paused (Spotify, Music),
+    /// for when Now Playing can't be read. They announce changes system-wide, which needs no permission.
     private var playing: [String: Bool] = [:]
+
+    private let nowPlaying = NowPlaying.shared
 
     func start() {
         guard !started else { resume(); return }
@@ -42,20 +55,25 @@ final class AudioWatcher {
                 self?.record("music", n)
             }
         }
-
-        let t = Timer(timeInterval: 1, repeats: true) { [weak self] _ in self?.poll() }
-        RunLoop.main.add(t, forMode: .common)
-        timer = t
+        nowPlaying.onChange = { [weak self] in self?.poll() }
+        nowPlaying.start()
+        schedule()
     }
 
-    /// Stop polling while the Mac sleeps or the screen is locked.
+    /// Stop watching while the Mac sleeps or the screen is locked.
     func pause() {
         timer?.invalidate()
         timer = nil
+        nowPlaying.stop()
     }
 
     func resume() {
         guard started, timer == nil else { return }
+        nowPlaying.start()
+        schedule()
+    }
+
+    private func schedule() {
         let t = Timer(timeInterval: 1, repeats: true) { [weak self] _ in self?.poll() }
         t.tolerance = 0.3
         RunLoop.main.add(t, forMode: .common)
@@ -67,49 +85,128 @@ final class AudioWatcher {
         playing[app] = (state == "playing")
     }
 
-    /// What was found at the last poll, for the Debug page: each app making sound and how it was read.
+    /// What was found at the last look, for the Debug page: each source of sound and how it was read.
     private(set) var sources: [String] = []
 
-    /// A sound has to last a few seconds before it counts, so notification dings don't,
-    /// and has to be gone for a few seconds before the pet decides it stopped.
-    private func poll() {
-        let found = detect()
-        let now = Self.loudest(found)
-        if now == candidate { streak += 1 } else { candidate = now; streak = 1 }
-        let needed = candidate == .none ? 4 : 3
-        if candidate != current && streak >= needed { current = candidate }
+    // MARK: Settling
 
-        // Same debounce for "is music playing at all": 3 s to start, 4 s to stop.
-        let music = found.contains(.music)
-        musicStreak = music == musicOn ? 0 : musicStreak + 1
-        if musicStreak >= (music ? 3 : 4) { musicOn = music; musicStreak = 0 }
+    /// A change has to hold for a moment before it counts, so a notification ding or the gap between two
+    /// songs doesn't flip the pet's mood. Now Playing is exact, so its changes need only a moment; sound
+    /// seen in the process list can be a ding or a stream left open, so it needs a few seconds.
+    struct Settle {
+        private(set) var value: MediaActivity
+        private var candidate: MediaActivity
+        private var since = Date.distantPast
+
+        init(_ value: MediaActivity = .none) { self.value = value; candidate = value }
+
+        /// Feed what is heard now; returns how long to wait before looking again (nil: settled).
+        mutating func feed(_ heard: MediaActivity, exact: Bool, now: Date = Date()) -> TimeInterval? {
+            if heard != candidate { candidate = heard; since = now }
+            guard candidate != value else { return nil }
+            let needed = AudioWatcher.delay(from: value, to: candidate, exact: exact)
+            let waited = now.timeIntervalSince(since)
+            if waited >= needed { value = candidate; return nil }
+            return needed - waited
+        }
     }
 
-    /// Calls beat music, music beats video, video beats anything else.
+    /// How long a change must hold. Starting is quick (the music is already playing); stopping waits a
+    /// little longer, so the pause between two songs doesn't end the vibe.
+    static func delay(from old: MediaActivity, to new: MediaActivity, exact: Bool) -> TimeInterval {
+        guard exact, old != .call, new != .call else { return new == .none ? 4 : 3 }
+        return new == .none ? 0.6 : 0.3
+    }
+
+    private var settleCurrent = Settle()
+    private var settleCall = Settle()
+    private var recheck: DispatchWorkItem?
+    private var lastFound = Set<MediaActivity>()
+
+    /// Looks again (`fresh`), or only re-checks a change that is waiting to settle.
+    private func poll(fresh: Bool = true) {
+        if fresh { lastFound = detect() }
+        let exact = nowPlaying.state != nil
+        let before = (current, onCall)
+        let wait1 = settleCurrent.feed(Self.loudest(lastFound), exact: exact)
+        // Calls are only ever seen in the process list, so they always take a few seconds to settle.
+        let wait2 = settleCall.feed(lastFound.contains(.call) ? .call : .none, exact: false)
+        current = settleCurrent.value
+        onCall = settleCall.value == .call
+        if let wait = [wait1, wait2].compactMap({ $0 }).min() {
+            recheck?.cancel()
+            let work = DispatchWorkItem { [weak self] in self?.poll(fresh: false) }
+            recheck = work
+            DispatchQueue.main.asyncAfter(deadline: .now() + wait + 0.02, execute: work)
+        }
+        if before != (current, onCall) { NotificationCenter.default.post(name: .mochiMediaChanged, object: self) }
+    }
+
+    /// What's playing, if several things are: music, then talk, then pictures, then an app that merely has
+    /// the speakers open. (A call isn't something playing: see `onCall`.)
     private static func loudest(_ found: Set<MediaActivity>) -> MediaActivity {
-        if found.contains(.call) { return .call }
-        if found.contains(.music) { return .music }
-        if found.contains(.video) { return .video }
-        if found.contains(.other) { return .other }
+        for kind in [MediaActivity.music, .podcast, .movie, .video, .other] where found.contains(kind) { return kind }
         return .none
+    }
+
+    // MARK: Detecting
+
+    /// What a Now Playing report counts as: nothing unless it is playing (see `MediaClassifier`).
+    func kind(of np: NowPlaying.State) -> MediaActivity? {
+        guard np.playing else { return nil }
+        switch np.kind {
+        case .music: return .music
+        case .podcast: return .podcast
+        case .movie: return .movie
+        case .video: return .video
+        }
+    }
+
+    /// Something is playing in a private browser window (see `MediaClassifier.isPrivate`).
+    var playingPrivately: Bool { playingNow?.isPrivate ?? false }
+
+    /// The Now Playing item behind `current`, while something is playing: the app, title and artist.
+    var playingNow: NowPlaying.State? {
+        guard let np = nowPlaying.state, np.playing, current != .none, current != .other else { return nil }
+        return np
     }
 
     private func detect() -> Set<MediaActivity> {
         var found = Set<MediaActivity>()
         var seen: [String] = []
+        let np = nowPlaying.state
+        if let np {
+            let who = np.name ?? np.app ?? "Something"
+            if let kind = kind(of: np) {
+                found.insert(kind)
+                // Private windows: never the title, just that it's private.
+                let what = np.isPrivate ? ", in a private window" : (np.title.map { ", " + $0 } ?? "")
+                seen.append("Now Playing: \(who) (\(Self.name(kind).lowercased()))\(what)")
+            } else {
+                seen.append(np.app == nil ? "Now Playing: nothing" : "Now Playing: \(who), paused")
+            }
+        }
         if #available(macOS 14.2, *) {
             for p in audioProcesses() where p.output {
-                guard var kind = classify(p.bundleID) else {
-                    if isPausable(p.bundleID) { seen.append("\(p.bundleID): open but not playing") }
+                guard var kind = classify(p.bundleID, nowPlaying: np != nil) else {
+                    if np == nil, isPausable(p.bundleID) { seen.append("\(p.bundleID): open but not playing") }
                     continue
                 }
                 // A chat app only counts as a call while it is also using the microphone;
                 // otherwise it is just an app that happens to be making (or holding) sound.
                 if kind == .call, !p.input { kind = .other }
+                // With Now Playing known, the process list only decides calls: an app that just has the
+                // speakers open may be silent (dictation, an idle tab, a chat app between dings).
+                if let np, kind != .call {
+                    // The Now Playing app itself (or its helper, e.g. com.google.Chrome.helper) is already listed.
+                    let isPlayer = np.app.map { p.bundleID == $0 || p.bundleID.hasPrefix($0 + ".") } ?? false
+                    if !isPlayer { seen.append("\(p.bundleID): has the speakers open, not counted (not in Now Playing)") }
+                    continue
+                }
                 found.insert(kind)
                 seen.append("\(p.bundleID): \(Self.name(kind))")
             }
-        } else if defaultOutputRunning() {
+        } else if np == nil, defaultOutputRunning() {
             found.insert(.other)
             seen.append("Something is using the speakers")
         }
@@ -121,7 +218,9 @@ final class AudioWatcher {
         switch kind {
         case .none: return "Nothing"
         case .music: return "Music"
+        case .podcast: return "Podcast"
         case .video: return "Video"
+        case .movie: return "Movie or show"
         case .call: return "Call"
         case .other: return "Other sound"
         }
@@ -134,7 +233,8 @@ final class AudioWatcher {
 
     // MARK: Classification
 
-    private func classify(_ bundleID: String) -> MediaActivity? {
+    /// `nowPlaying`: the play state comes from Now Playing, so music players needn't be checked here.
+    private func classify(_ bundleID: String, nowPlaying: Bool = false) -> MediaActivity? {
         let b = bundleID.lowercased()
         func has(_ keys: [String]) -> Bool { keys.contains { b.contains($0) } }
 
@@ -146,8 +246,8 @@ final class AudioWatcher {
         // Spotify and Apple Music hold their audio stream open even when paused, so only count them
         // while they say they are actually playing. (Before the first play/pause/track change since
         // Mochi started, their state is unknown and they are ignored.)
-        if has(["spotify"]) { return playing["spotify"] == true ? .music : nil }
-        if has(["com.apple.music", "com.apple.itunes"]) { return playing["music"] == true ? .music : nil }
+        if has(["spotify"]) { return nowPlaying || playing["spotify"] == true ? .music : nil }
+        if has(["com.apple.music", "com.apple.itunes"]) { return nowPlaying || playing["music"] == true ? .music : nil }
 
         if has(["us.zoom", "com.microsoft.teams", "com.apple.facetime", "slack", "skype", "webex", "discord",
                 "com.apple.ichat", "whatsapp", "com.hnc"]) { return .call }

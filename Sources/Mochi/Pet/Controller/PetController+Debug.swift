@@ -90,15 +90,17 @@ extension PetController {
         if heard != media {
             sound += settings.reactToMedia ? " (ignored: other sound is switched off in Behavior)" : " (ignored: reactions are off)"
         }
-        if audio.musicOn, heard != .music { sound += " + music" }
+        if audio.onCall { sound += settings.quietOnCalls ? " + on a call" : " + on a call (ignored: Stay quiet during calls is off)" }
         d.sound = sound
         d.soundApps = audio.sources
 
         // Why the pet is doing what it is doing, in plain words.
         var why: [String] = []
         if userAway { why.append("asleep because you're away") }
-        if media == .call { why.append("quiet for a call") }
+        if onCall { why.append("quiet for a call") }
         if media == .video { why.append("watching a video") }
+        if media == .movie { why.append("watching a film in 3D glasses, keeping quiet") }
+        if media == .podcast { why.append("listening to a podcast") }
         if view.musicBpm > 0 { why.append("vibing to the music") }
         if focusing { why.append("calm for a focus session") }
         if mind.energy < 0.25 { why.append("tired") }

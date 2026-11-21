@@ -43,16 +43,16 @@ enum LogicTest {
         check("starts over after a 15 minute break", a.reminderElapsed[.water] == nil)
 
         said = a.saidCount
-        a.media = .call
+        a.onCall = true
         pass(700, idle: 2)
         check("held back during a call", a.saidCount == said && (a.reminderElapsed[.water] ?? 0) >= 600)
-        a.media = .none
+        a.onCall = false
         pass(2, idle: 2)
         check("fires as soon as the call ends", a.saidCount == said + 1)
-        a.reminderElapsed = [:]; a.media = .call; said = a.saidCount
+        a.reminderElapsed = [:]; a.onCall = true; said = a.saidCount
         pass(905, idle: 2)
         check("a call only delays it by 5 minutes", a.saidCount == said + 1)
-        a.media = .none
+        a.onCall = false
 
         s.reminderMinutes = [ReminderKind.water.rawValue: 10, ReminderKind.posture.rawValue: 10, ReminderKind.eyes.rawValue: 10]
         a.reminderElapsed = [:]
@@ -128,18 +128,178 @@ enum LogicTest {
         a.mediaChanged()
         check("music stopping ends the vibe", !a.view.vibing && a.view.musicBpm == 0)
 
-        // Spotify playing while a Discord voice channel holds the mic: the call wins `current`, but it's still music.
-        AudioWatcher.shared.musicOn = true
-        a.media = .call
+        // Spotify playing while a Discord voice channel holds the mic: still music, just a quiet pet.
+        a.onCall = true
+        a.media = .music
         a.mediaChanged()
         a.view.mood = .idle
         check("music during a call (e.g. a Discord voice channel) still gets the vibe", a.view.vibing && a.view.musicBpm > 0)
         check("…while the pet stays quiet for the call", !a.canSpeak(force: false))
-        AudioWatcher.shared.musicOn = false
-        a.updateBeat()
-        check("the vibe ends when that music stops", a.view.musicBpm == 0)
         a.media = .none
         a.mediaChanged()
+        check("the vibe ends when that music stops", a.view.musicBpm == 0)
+        // The bug: a YouTube video with Discord holding the mic showed nothing, because the call hid the video.
+        a.media = .video
+        a.mediaChanged()
+        check("a video during a call is still watched (screen glow on)", a.view.watching == .video)
+        a.media = .movie
+        a.mediaChanged()
+        check("a film during a call still gets the 3D glasses", a.view.watching == .movie)
+        let callFilm = PetContext(surface: .floor, axisFraction: 0.5, cursorDistance: 900, secondsSinceInteraction: 60, hour: 20,
+                                  platformAbove: false, canClimb: false, canHide: false, media: .movie, onCall: true, userAway: false,
+                                  focusing: false, species: a.species, energy: 0.8, fullness: 0.8, joy: 0.8, bondLevel: 3)
+        var watchingOnCall = 0
+        for _ in 0..<500 { if case .idle = brain.nextDecision(callFilm).action { watchingOnCall += 1 } }
+        check("…and it sits still watching rather than pottering about", watchingOnCall > 400, "\(watchingOnCall / 5)% idle")
+        a.onCall = false
+        a.media = .none
+        a.mediaChanged()
+
+        // MARK: Now Playing
+        print("--- Now Playing ---")
+        let w = AudioWatcher.shared
+        func np(_ playing: Bool, _ app: String?, video: Bool = false) -> NowPlaying.State {
+            NowPlaying.State(playing: playing, app: app, video: video)
+        }
+        check("Spotify playing is music", w.kind(of: NowPlaying.State(playing: true, app: "com.spotify.client", album: "Reprise", duration: 240)) == .music)
+        check("Spotify paused is nothing", w.kind(of: np(false, "com.spotify.client")) == nil)
+        check("a player that says it shows a video is a video", w.kind(of: np(true, "com.google.Chrome", video: true)) == .video)
+        check("IINA playing is a film", w.kind(of: np(true, "com.colliderli.iina")) == .movie)
+
+        print("--- What's playing ---")
+        func kind(_ app: String, _ title: String, by artist: String? = nil, album: String? = nil, minutes: Double = 0,
+                  video: Bool = false, audio: Bool = false) -> MediaClassifier.Kind {
+            MediaClassifier.kind(app: app, title: title, artist: artist, album: album,
+                                 duration: minutes > 0 ? minutes * 60 : nil, video: video, audio: audio)
+        }
+        let chrome = "com.google.Chrome"
+        check("a song in Spotify is music", kind("com.spotify.client", "Muththa Mazhai (Reprise)", by: "A.R. Rahman", album: "Thug Life", minutes: 4) == .music)
+        check("a podcast episode in Spotify is a podcast", kind("com.spotify.client", "#231 - How to Focus", by: "Huberman Lab", minutes: 95) == .podcast)
+        check("an hour of talk in Spotify without an album is a podcast", kind("com.spotify.client", "Monday chat", by: "Some Show", minutes: 60) == .podcast)
+        check("Apple Podcasts is a podcast", kind("com.apple.podcasts", "Anything") == .podcast)
+        check("Audible is a podcast (an audiobook)", kind("com.audible.iphone", "Chapter 3") == .podcast)
+        check("Netflix is a film or show", kind("com.netflix.Netflix", "Stranger Things") == .movie)
+        check("the TV app is a film or show", kind("com.apple.TV", "Severance") == .movie)
+        check("a YouTube video is a video", kind(chrome, "OUR LAST GTA V VIDEO", by: "MoreSidemen", minutes: 36) == .video)
+        check("a music video on YouTube is music", kind(chrome, "Blinding Lights (Official Video)", by: "TheWeekndVEVO", minutes: 4) == .music)
+        check("an auto-generated YouTube song is music", kind(chrome, "Kesariya", by: "Arijit Singh - Topic", minutes: 5) == .music)
+        check("YouTube Music (it has an album) is music", kind(chrome, "Levitating", by: "Dua Lipa", album: "Future Nostalgia", minutes: 3.4) == .music)
+        check("a podcast on YouTube is a podcast", kind(chrome, "The Diary Of A CEO Podcast: Episode 12", by: "DOAC", minutes: 90) == .podcast)
+        check("Netflix in a browser is a film or show", kind(chrome, "Wednesday | Netflix", minutes: 50) == .movie)
+        check("a two-hour video with no channel is a film", kind(chrome, "Interstellar", minutes: 169, video: true) == .movie)
+        check("words like 'deep' don't make it a podcast", kind(chrome, "Deep sleep sounds keep calm", by: "Relax", minutes: 30) == .video)
+        check("an unknown audio app playing a short track is music", kind("com.example.player", "Track 1", minutes: 3, audio: true) == .music)
+
+        check("helper reports are read", NowPlaying.state(from: ["playing": true, "app": "com.spotify.client", "type": 1, "artist": "X", "duration": 200])
+              == NowPlaying.State(playing: true, app: "com.spotify.client", artist: "X", duration: 200, audio: true))
+
+        print("--- Reacting to each kind ---")
+        a.apply(Decision(action: .idle, duration: 1))
+        for (m, gear) in [(MediaActivity.movie, MediaGear.movie), (.video, .video), (.podcast, .podcast), (.music, .none)] {
+            a.media = m; a.mediaChanged(); a.updateBeat()
+            check("\(AudioWatcher.name(m).lowercased()): the pet has the right gear on", a.view.watching == gear)
+        }
+        a.media = .movie; a.mediaChanged()
+        check("during a film the pet keeps quiet", !a.canSpeak(force: false))
+        check("during a film it doesn't dance or wear headphones", a.view.musicBpm == 0)
+        let film = PetContext(surface: .floor, axisFraction: 0.5, cursorDistance: 900, secondsSinceInteraction: 60, hour: 20,
+                              platformAbove: true, canClimb: true, canHide: true, media: .movie, userAway: false, focusing: false,
+                              species: a.species, energy: 0.8, fullness: 0.8, joy: 0.8, bondLevel: 3)
+        var sitting = 0
+        for _ in 0..<1000 { if case .idle = brain.nextDecision(film).action { sitting += 1 } }
+        check("during a film it mostly sits still", sitting > 800, "\(sitting / 10)% idle")
+        var podcastPicks = Set<String>()
+        let talk = PetContext(surface: .floor, axisFraction: 0.5, cursorDistance: 900, secondsSinceInteraction: 60, hour: 20,
+                                           platformAbove: false, canClimb: false, canHide: false, media: .podcast, userAway: false, focusing: false,
+                                           species: a.species, energy: 0.8, fullness: 0.8, joy: 0.8, bondLevel: 3)
+        for _ in 0..<1000 { podcastPicks.insert(String(describing: brain.nextDecision(talk).action).components(separatedBy: "(")[0]) }
+        check("during a podcast it never dances or does zoomies", !podcastPicks.contains("dance") && !podcastPicks.contains("zoomies"),
+              podcastPicks.sorted().joined(separator: ", "))
+        a.media = .none; a.mediaChanged(from: .movie); a.updateBeat()
+        check("when it ends the gear comes off", a.view.watching == .none)
+
+        print("--- Acts ---")
+        for kind in [MediaActivity.music, .podcast, .video, .movie] {
+            check("\(AudioWatcher.name(kind).lowercased()) has five acts", MediaAct.acts(for: kind).count == 5)
+        }
+        check("every act belongs to exactly one kind (plus five for private windows)", MediaAct.allCases.count == 25 && MediaAct.privacy.count == 5)
+        var repeats = 0
+        for act in MediaAct.allCases { for _ in 0..<50 where MediaAct.pick(for: act.kind, after: act) == act { repeats += 1 } }
+        check("switching acts never picks the same one again", repeats == 0)
+        var seen = Set<MediaAct>()
+        for _ in 0..<400 { if let p = MediaAct.pick(for: .video) { seen.insert(p) } }
+        check("over time every video act turns up", seen.count == 5)
+        for kind in [MediaActivity.music, .podcast, .video, .movie] {
+            a.media = kind; a.mediaChanged()
+            check("\(AudioWatcher.name(kind).lowercased()) starts one of its own acts", a.view.act?.kind == kind, a.view.act?.label ?? "none")
+        }
+        a.media = .music; a.mediaChanged()
+        let firstAct = a.view.act
+        a.nextActChange = .distantPast
+        a.mediaTick(Date())
+        check("after a few minutes it moves on to another act", a.view.act != firstAct && a.view.act?.kind == .music)
+        a.view.angle = 0                       // upright: props are put away on walls and the ceiling
+        a.view.act = .karaoke; a.view.mood = .idle
+        check("singing karaoke it shows the mic, not headphones", a.view.showsAct && !(a.view.act?.wearsHeadphones ?? true))
+        a.view.act = .dj
+        check("DJing it wears headphones", a.view.act?.wearsHeadphones == true)
+        a.view.mood = .walk
+        check("a turntable doesn't come along on a walk", !a.view.showsAct)
+        a.view.act = .rave
+        check("glow sticks do come along on a walk", a.view.showsAct)
+        a.view.mood = .idle
+        a.media = .none; a.mediaChanged()
+        check("when nothing plays there's no act", a.view.act == nil)
+
+        print("--- Private windows ---")
+        let chromeID = "com.google.Chrome"
+        check("Chrome's incognito placeholder counts as private", MediaClassifier.isPrivate(app: chromeID, title: "A site is playing media", artist: ""))
+        check("…even before the artist has cleared", MediaClassifier.isPrivate(app: chromeID, title: "A site is playing media", artist: "MoreSidemen"))
+        check("a normal YouTube video isn't private", !MediaClassifier.isPrivate(app: chromeID, title: "SIDEMEN GTA V BINGO", artist: "MoreSidemen"))
+        check("another browser's placeholder counts too", MediaClassifier.isPrivate(app: "org.mozilla.firefox", title: "Firefox is playing media", artist: nil))
+        check("a song that happens to say 'is playing' isn't private", !MediaClassifier.isPrivate(app: chromeID, title: "My heart is playing music", artist: "Some Band"))
+        check("only browsers have private windows", !MediaClassifier.isPrivate(app: "com.spotify.client", title: "A site is playing media", artist: ""))
+        let signatures: [(String, MediaAct)] = [(chromeID, .spy), ("org.mozilla.firefox", .masquerade), ("com.apple.Safari", .peekaboo),
+                                                ("com.microsoft.edgemac", .sleepMask), ("com.brave.Browser", .turnAway)]
+        check("each browser starts with its own act (Chrome spy, Firefox mask, Safari paws, Edge sleep mask, others turn around)",
+              signatures.allSatisfy { MediaAct.signature(for: MediaClassifier.Browser(app: $0.0)) == $0.1 })
+        var privateRepeats = 0
+        for act in MediaAct.privacy { for _ in 0..<40 where MediaAct.pickPrivate(after: act) == act { privateRepeats += 1 } }
+        check("it moves on to the other privacy acts without repeating", privateRepeats == 0)
+
+        a.media = .video; a.privately = true; a.mediaChanged()
+        check("something private playing: it looks away", a.view.act?.isPrivacy == true, a.view.act?.label ?? "none")
+        check("…and the model hears nothing about what it is", a.happeningNow.contains("private window") && !a.happeningNow.contains("video"))
+        a.nextActChange = .distantPast
+        let firstCover = a.view.act
+        a.mediaTick(Date())
+        check("…switching to another way of not looking after a while", a.view.act?.isPrivacy == true && a.view.act != firstCover)
+        a.view.act = .turnAway; a.view.mood = .idle; a.view.angle = 0
+        check("turned around, its face is hidden", a.view.hidesFace)
+        a.privately = false; a.mediaChanged()
+        check("back in a normal window, a normal video act again", a.view.act?.isPrivacy == false && a.view.act?.kind == .video)
+        a.media = .none; a.mediaChanged()
+
+        var settle = AudioWatcher.Settle()
+        let t0 = Date()
+        check("music from Now Playing starts within half a second",
+              settle.feed(.music, exact: true, now: t0) != nil && settle.feed(.music, exact: true, now: t0 + 0.35) == nil && settle.value == .music)
+        _ = settle.feed(.none, exact: true, now: t0 + 1)
+        check("…and stops within a second of pausing", settle.feed(.none, exact: true, now: t0 + 1.65) == nil && settle.value == .none)
+        _ = settle.feed(.music, exact: true, now: t0 + 2)
+        _ = settle.feed(.music, exact: true, now: t0 + 2.4)
+        _ = settle.feed(.none, exact: true, now: t0 + 3)
+        check("the gap between two songs doesn't end the vibe", settle.feed(.music, exact: true, now: t0 + 3.3) == nil && settle.value == .music)
+        var fallback = AudioWatcher.Settle()
+        check("sound only seen in the speaker list still waits a few seconds",
+              fallback.feed(.other, exact: false, now: t0) != nil && fallback.feed(.other, exact: false, now: t0 + 1) != nil
+              && fallback.feed(.other, exact: false, now: t0 + 3.1) == nil && fallback.value == .other)
+        check("a call still takes a few seconds to count", AudioWatcher.delay(from: .music, to: .call, exact: true) >= 3)
+
+        a.apply(Decision(action: .dance, duration: 6))
+        a.media = .music; a.mediaChanged()
+        a.media = .none; a.mediaChanged()
+        check("a dance stops when the music does", a.remaining <= 0.4, String(format: "%.1fs left", a.remaining))
 
         // MARK: Two pets
         print("--- Two pets ---")
