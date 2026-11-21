@@ -99,10 +99,22 @@ final class MindBrain: Brain {
             if drowsy || tired { o.append((3, d(.sleep, 10, 20))) }
         } else {
             switch ctx.media {
+            case .movie:
+                // A film or a show: 3D glasses on, popcorn in hand, and hardly a move until it's over.
+                o = [(14, d(.idle, 8, 14)), (1, d(.lookAround, 2, 3)), (0.5, d(.stretch, 2.4, 2.4))]
+                if drowsy || tired { o.append((3, d(.sleep, 20, 40))) }
+
             case .video:
-                // Watching along.
-                o = [(9, d(.idle, 5, 10)), (2, d(.lookAround, 2, 3)), (1, d(.stretch, 2, 3))]
+                // Watching along, now and then shifting about or giggling (see mediaTick).
+                o = [(9, d(.idle, 5, 10)), (2, d(.lookAround, 2, 3)), (1, d(.stretch, 2, 3)), (1.5, d(.walk(axis: axis), 1.5, 3))]
                 if drowsy || tired { o.append((3, d(.sleep, 10, 20))) }
+
+            case .podcast:
+                // Listening: calm, pottering about and nodding along, no dancing or zoomies.
+                o = [(8, d(.idle, 4, 8)), (6, d(.walk(axis: axis), 2, 5)), (2.5, d(.lookAround, 2, 3)),
+                     (1, d(.stretch, 2.4, 2.4))]
+                if ctx.cursorDistance < 500 { o.append((2, d(.chase, 3, 5))) }
+                if drowsy || tired { o.append((3, d(.sleep, 10, 25))) }
 
             case .none, .call, .music, .other:
                 // Music doesn't change what it does, only how: it goes about its usual day while vibing
@@ -124,13 +136,13 @@ final class MindBrain: Brain {
                 }
             }
 
-            if ctx.platformAbove && ctx.surface == .floor {
+            if ctx.platformAbove && ctx.surface == .floor && !ctx.media.isWatching {
                 o.append((3, Decision(action: .leap, duration: 2)))
             }
-            if ctx.canHide && ctx.media != .video {
+            if ctx.canHide && !ctx.media.isWatching {
                 o.append((1.6, d(.hide, 14, 16)))
             }
-            if ctx.canClimb && ctx.media != .video {
+            if ctx.canClimb && !ctx.media.isWatching {
                 o.append((3.5, d(.climbEdge, 10, 14)))
             }
             // Unmet needs: sit and sulk, and now and then say what's wrong.

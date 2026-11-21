@@ -99,6 +99,8 @@ extension PetController {
         if userAway { why.append("asleep because you're away") }
         if media == .call { why.append("quiet for a call") }
         if media == .video { why.append("watching a video") }
+        if media == .movie { why.append("watching a film in 3D glasses, keeping quiet") }
+        if media == .podcast { why.append("listening to a podcast") }
         if view.musicBpm > 0 { why.append("vibing to the music") }
         if focusing { why.append("calm for a focus session") }
         if mind.energy < 0.25 { why.append("tired") }

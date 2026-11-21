@@ -14,8 +14,10 @@ extension PetController {
     var happeningNow: String {
         var parts: [String] = []
         switch media {
-        case .music: parts.append("Music is playing\(soundSource).")
-        case .video: parts.append("A video is playing\(soundSource).")
+        case .music: parts.append("Music is playing\(describe(audio.playingNow)).")
+        case .podcast: parts.append("Your human is listening to a podcast\(describe(audio.playingNow)).")
+        case .video: parts.append("Your human is watching a video\(describe(audio.playingNow)).")
+        case .movie: parts.append("Your human is watching a film or show\(describe(audio.playingNow)); you are watching too, in 3D glasses with popcorn.")
         case .call: parts.append("Your human is on a call.")
         case .other: parts.append("Some sound is playing\(soundSource).")
         case .none: break

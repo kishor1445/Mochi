@@ -24,6 +24,7 @@ final class PetView: NSView {
     var spin: CGFloat = 0                // extra twirl / wobble around the pet's own centre
     var gaze: CGPoint = .zero            // where the eyes look (local coordinates)
     var musicBpm: CGFloat = 0            // > 0 while music plays: headphones + bobbing to the beat
+    var watching: MediaGear = .none      // a podcast, video or film is on: earbud, screen glow, 3D glasses (PetView+Media)
     var outfit: Outfit = .none           // what the pet is wearing
     var sweat = false                    // the Mac is working hard
     var shiver = false                   // the battery is nearly empty

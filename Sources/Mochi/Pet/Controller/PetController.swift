@@ -114,6 +114,8 @@ final class PetController {
 
     // Awareness
     var media: MediaActivity = .none
+    var playingTitle: String?               // the song or show last reacted to, so a new one is noticed
+    var nextMediaMoment = Date.distantFuture   // the next little reaction to a podcast or video
     var userAway = false
     var activeSeconds: TimeInterval = 0
     var lastSlow = Date.distantPast

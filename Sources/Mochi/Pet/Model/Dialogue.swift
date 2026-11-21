@@ -193,6 +193,6 @@ enum Dialogue {
             Moment(key: "focusStart", about: "a focus session starts: you promise to keep quiet and cheer them on", lines: focusStart),
             Moment(key: "focusDone", about: "a focus session just finished: celebrate and suggest a break", lines: focusDone),
             Moment(key: "focusStopped", about: "your human stopped a focus session early", lines: focusStopped)
-        ]
+        ] + mediaMoments
     }
 }

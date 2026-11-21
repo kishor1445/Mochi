@@ -18,7 +18,20 @@ final class NowPlaying {
         var app: String?        // bundle identifier of the player ("com.spotify.client", "com.google.Chrome")
         var name: String?       // its name as the system shows it ("Spotify")
         var title: String?
+        var artist: String?     // artist, podcast or YouTube channel
+        var album: String?
+        var duration: Double?   // seconds, when the player says
         var video: Bool         // the player says it is showing a video
+        var audio: Bool         // the player says it is playing audio only
+
+        init(playing: Bool, app: String?, name: String? = nil, title: String? = nil, artist: String? = nil,
+             album: String? = nil, duration: Double? = nil, video: Bool = false, audio: Bool = false) {
+            self.playing = playing; self.app = app; self.name = name; self.title = title; self.artist = artist
+            self.album = album; self.duration = duration; self.video = video; self.audio = audio
+        }
+
+        /// What kind of thing this is: a song, a podcast, a film, a YouTube video…
+        var kind: MediaClassifier.Kind { MediaClassifier.kind(of: self) }
     }
 
     /// The latest report, or nil while it isn't known (not started, or the helper can't run on this Mac).
@@ -107,8 +120,11 @@ final class NowPlaying {
             guard let s = obj[key] as? String, !s.isEmpty else { return nil }
             return s
         }
+        let length = (obj["duration"] as? NSNumber)?.doubleValue
         return State(playing: obj["playing"] as? Bool ?? false, app: text("app"), name: text("name"),
-                     title: text("title"), video: (obj["type"] as? Int) == 2)
+                     title: text("title"), artist: text("artist"), album: text("album"),
+                     duration: length.flatMap { $0 > 0 && $0.isFinite ? $0 : nil },
+                     video: (obj["type"] as? Int) == 2, audio: (obj["type"] as? Int) == 1)
     }
 
     /// Runs inside osascript. Reads Now Playing every `interval` seconds, prints a line when anything
@@ -131,6 +147,9 @@ final class NowPlaying {
         app: client.isNil() ? null : str(client.bundleIdentifier),
         name: client.isNil() ? null : str(client.displayName),
         title: md === null || md.isNil() ? null : str(md.title),
+        artist: md === null || md.isNil() ? null : str(md.trackArtistName),
+        album: md === null || md.isNil() ? null : str(md.albumName),
+        duration: md === null || md.isNil() ? 0 : Math.round(Number(md.duration) || 0),
         type: md === null || md.isNil() ? 0 : Number(md.mediaType)
       };
     }

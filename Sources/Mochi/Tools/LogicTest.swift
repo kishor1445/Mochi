@@ -145,15 +145,64 @@ enum LogicTest {
         print("--- Now Playing ---")
         let w = AudioWatcher.shared
         func np(_ playing: Bool, _ app: String?, video: Bool = false) -> NowPlaying.State {
-            NowPlaying.State(playing: playing, app: app, name: nil, title: nil, video: video)
+            NowPlaying.State(playing: playing, app: app, video: video)
         }
-        check("Spotify playing is music", w.kind(of: np(true, "com.spotify.client")) == .music)
+        check("Spotify playing is music", w.kind(of: NowPlaying.State(playing: true, app: "com.spotify.client", album: "Reprise", duration: 240)) == .music)
         check("Spotify paused is nothing", w.kind(of: np(false, "com.spotify.client")) == nil)
-        check("YouTube in a browser is music to vibe to", w.kind(of: np(true, "com.google.Chrome")) == .music)
         check("a player that says it shows a video is a video", w.kind(of: np(true, "com.google.Chrome", video: true)) == .video)
-        check("IINA playing is a video", w.kind(of: np(true, "com.colliderli.iina")) == .video)
-        check("helper reports are read", NowPlaying.state(from: ["playing": true, "app": "com.spotify.client", "type": 1])
-              == np(true, "com.spotify.client"))
+        check("IINA playing is a film", w.kind(of: np(true, "com.colliderli.iina")) == .movie)
+
+        print("--- What's playing ---")
+        func kind(_ app: String, _ title: String, by artist: String? = nil, album: String? = nil, minutes: Double = 0,
+                  video: Bool = false, audio: Bool = false) -> MediaClassifier.Kind {
+            MediaClassifier.kind(app: app, title: title, artist: artist, album: album,
+                                 duration: minutes > 0 ? minutes * 60 : nil, video: video, audio: audio)
+        }
+        let chrome = "com.google.Chrome"
+        check("a song in Spotify is music", kind("com.spotify.client", "Muththa Mazhai (Reprise)", by: "A.R. Rahman", album: "Thug Life", minutes: 4) == .music)
+        check("a podcast episode in Spotify is a podcast", kind("com.spotify.client", "#231 - How to Focus", by: "Huberman Lab", minutes: 95) == .podcast)
+        check("an hour of talk in Spotify without an album is a podcast", kind("com.spotify.client", "Monday chat", by: "Some Show", minutes: 60) == .podcast)
+        check("Apple Podcasts is a podcast", kind("com.apple.podcasts", "Anything") == .podcast)
+        check("Audible is a podcast (an audiobook)", kind("com.audible.iphone", "Chapter 3") == .podcast)
+        check("Netflix is a film or show", kind("com.netflix.Netflix", "Stranger Things") == .movie)
+        check("the TV app is a film or show", kind("com.apple.TV", "Severance") == .movie)
+        check("a YouTube video is a video", kind(chrome, "OUR LAST GTA V VIDEO", by: "MoreSidemen", minutes: 36) == .video)
+        check("a music video on YouTube is music", kind(chrome, "Blinding Lights (Official Video)", by: "TheWeekndVEVO", minutes: 4) == .music)
+        check("an auto-generated YouTube song is music", kind(chrome, "Kesariya", by: "Arijit Singh - Topic", minutes: 5) == .music)
+        check("YouTube Music (it has an album) is music", kind(chrome, "Levitating", by: "Dua Lipa", album: "Future Nostalgia", minutes: 3.4) == .music)
+        check("a podcast on YouTube is a podcast", kind(chrome, "The Diary Of A CEO Podcast: Episode 12", by: "DOAC", minutes: 90) == .podcast)
+        check("Netflix in a browser is a film or show", kind(chrome, "Wednesday | Netflix", minutes: 50) == .movie)
+        check("a two-hour video with no channel is a film", kind(chrome, "Interstellar", minutes: 169, video: true) == .movie)
+        check("words like 'deep' don't make it a podcast", kind(chrome, "Deep sleep sounds keep calm", by: "Relax", minutes: 30) == .video)
+        check("an unknown audio app playing a short track is music", kind("com.example.player", "Track 1", minutes: 3, audio: true) == .music)
+
+        check("helper reports are read", NowPlaying.state(from: ["playing": true, "app": "com.spotify.client", "type": 1, "artist": "X", "duration": 200])
+              == NowPlaying.State(playing: true, app: "com.spotify.client", artist: "X", duration: 200, audio: true))
+
+        print("--- Reacting to each kind ---")
+        a.apply(Decision(action: .idle, duration: 1))
+        for (m, gear) in [(MediaActivity.movie, MediaGear.movie), (.video, .video), (.podcast, .podcast), (.music, .none)] {
+            a.media = m; a.mediaChanged(); a.updateBeat()
+            check("\(AudioWatcher.name(m).lowercased()): the pet has the right gear on", a.view.watching == gear)
+        }
+        a.media = .movie; a.mediaChanged()
+        check("during a film the pet keeps quiet", !a.canSpeak(force: false))
+        check("during a film it doesn't dance or wear headphones", a.view.musicBpm == 0)
+        let film = PetContext(surface: .floor, axisFraction: 0.5, cursorDistance: 900, secondsSinceInteraction: 60, hour: 20,
+                              platformAbove: true, canClimb: true, canHide: true, media: .movie, userAway: false, focusing: false,
+                              species: a.species, energy: 0.8, fullness: 0.8, joy: 0.8, bondLevel: 3)
+        var sitting = 0
+        for _ in 0..<1000 { if case .idle = brain.nextDecision(film).action { sitting += 1 } }
+        check("during a film it mostly sits still", sitting > 800, "\(sitting / 10)% idle")
+        var podcastPicks = Set<String>()
+        let talk = PetContext(surface: .floor, axisFraction: 0.5, cursorDistance: 900, secondsSinceInteraction: 60, hour: 20,
+                                           platformAbove: false, canClimb: false, canHide: false, media: .podcast, userAway: false, focusing: false,
+                                           species: a.species, energy: 0.8, fullness: 0.8, joy: 0.8, bondLevel: 3)
+        for _ in 0..<1000 { podcastPicks.insert(String(describing: brain.nextDecision(talk).action).components(separatedBy: "(")[0]) }
+        check("during a podcast it never dances or does zoomies", !podcastPicks.contains("dance") && !podcastPicks.contains("zoomies"),
+              podcastPicks.sorted().joined(separator: ", "))
+        a.media = .none; a.mediaChanged(from: .movie); a.updateBeat()
+        check("when it ends the gear comes off", a.view.watching == .none)
 
         var settle = AudioWatcher.Settle()
         let t0 = Date()

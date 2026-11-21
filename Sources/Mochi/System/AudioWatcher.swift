@@ -4,10 +4,15 @@ import CoreAudio
 /// What kind of sound is playing on the Mac right now.
 enum MediaActivity: Equatable {
     case none
-    case music      // Music, Spotify, ...
-    case video      // QuickTime, VLC, IINA, ...
+    case music      // a song: Spotify, Apple Music, YouTube Music…
+    case podcast    // a podcast or an audiobook
+    case video      // YouTube and other clips
+    case movie      // a film or a show: Netflix, Prime Video, the TV app, IINA…
     case call       // Zoom, Teams, FaceTime, Discord, ...
-    case other      // browsers and everything else
+    case other      // an app with the speakers open (only when Now Playing can't be read)
+
+    /// Something with pictures that the pet sits down to watch.
+    var isWatching: Bool { self == .video || self == .movie }
 }
 
 extension Notification.Name {
@@ -137,23 +142,29 @@ final class AudioWatcher {
         if before != (current, musicOn) { NotificationCenter.default.post(name: .mochiMediaChanged, object: self) }
     }
 
-    /// Calls beat music, music beats video, video beats anything else.
+    /// Calls beat whatever is playing, which beats an app that merely has the speakers open.
     private static func loudest(_ found: Set<MediaActivity>) -> MediaActivity {
-        if found.contains(.call) { return .call }
-        if found.contains(.music) { return .music }
-        if found.contains(.video) { return .video }
-        if found.contains(.other) { return .other }
+        for kind in [MediaActivity.call, .music, .podcast, .movie, .video, .other] where found.contains(kind) { return kind }
         return .none
     }
 
     // MARK: Detecting
 
-    /// What a Now Playing report counts as: nothing unless it is playing, a video if the player says so
-    /// or is a video app, music otherwise (a song in Spotify, but also YouTube in a browser).
+    /// What a Now Playing report counts as: nothing unless it is playing (see `MediaClassifier`).
     func kind(of np: NowPlaying.State) -> MediaActivity? {
         guard np.playing else { return nil }
-        if np.video || np.app.map({ classify($0, nowPlaying: true) == .video }) == true { return .video }
-        return .music
+        switch np.kind {
+        case .music: return .music
+        case .podcast: return .podcast
+        case .movie: return .movie
+        case .video: return .video
+        }
+    }
+
+    /// The Now Playing item behind `current`, while something is playing: the app, title and artist.
+    var playingNow: NowPlaying.State? {
+        guard let np = nowPlaying.state, np.playing, current != .none, current != .call, current != .other else { return nil }
+        return np
     }
 
     private func detect() -> Set<MediaActivity> {
@@ -201,7 +212,9 @@ final class AudioWatcher {
         switch kind {
         case .none: return "Nothing"
         case .music: return "Music"
+        case .podcast: return "Podcast"
         case .video: return "Video"
+        case .movie: return "Movie or show"
         case .call: return "Call"
         case .other: return "Other sound"
         }

@@ -82,7 +82,9 @@ keystrokes, your screen or your calendar.
 
 **Reacts to what is happening on your Mac** (no special permissions)
 - **Music** (Spotify, Apple Music, YouTube or any site in a browser, ...): puts on headphones and vibes along while it carries on as usual: it walks in step with the beat, grooves side to side, taps its feet, sometimes closes its eyes to enjoy the song, and now and then breaks into a proper dance. It goes by what your Mac shows as Now Playing (the media controls in Control Center), so it starts within a moment of you pressing play, stops within a second of pausing, and isn't fooled by apps that just keep the speakers open, like dictation tools or an idle browser tab
-- **Videos** (QuickTime, VLC, IINA, ...): settles down to watch ("Movie time! 🍿")
+- **Podcasts and audiobooks** (Podcasts, Overcast, Audible, a podcast in Spotify or on YouTube, ...): puts one earbud in, nods along, now and then thinks it over (three little dots) and says "Mm-hmm 🤔" or "Wait, really?". No dancing
+- **Films and shows** (Netflix, Prime Video, Disney+, the TV app, IINA, VLC, ...): puts on 3D glasses, grabs a bucket of popcorn and munches away in the flicker of the screen, quiet and still until the credits
+- **Videos** (YouTube and other sites): sits down to watch with the screen's light on its face and the screen reflected in its eyes, and giggles now and then
 - **Calls** (Zoom, Teams, FaceTime, Discord, ...): goes quiet and still
 - **Anything else making sound** (games, etc.): only if your Mac can't report Now Playing and you switch on "React to other audio"
 - **Typing**: bops along with every key you press and cheers when you're on a roll or typing fast. It only reads the system's running count of key presses, never which keys
@@ -164,7 +166,8 @@ Sources/Mochi
 │   │   ├── +Movement              walking surfaces, corners, hide and peek, visiting the buddy
 │   │   ├── +Physics               falling, landing, leaping, slipping, dragging, throwing
 │   │   ├── +Geometry              screen frame, Dock, window platforms
-│   │   ├── +Awareness             media, idle, battery, load, reminders, calendar
+│   │   ├── +Awareness             idle, battery, load, reminders, calendar
+│   │   ├── +Media                 reacting to music, podcasts, videos, films and calls
 │   │   ├── +AI                    remarks, typed requests, two-pet conversations
 │   │   ├── +Input                 cursor shake / hover, typing along
 │   │   ├── +Toys                  treat and ball handling
@@ -177,11 +180,13 @@ Sources/Mochi
 │   │   ├── +Face                  eyes, mouths, eyewear
 │   │   ├── +Outfits               things worn on the head
 │   │   ├── +Power                 power-move effects
-│   │   └── +Effects               sweat, headphones, Zs, notes, hearts
+│   │   ├── +Effects               sweat, headphones, Zs, notes, hearts
+│   │   └── +Media                 3D glasses, popcorn, earbud, the screen's glow
 │   └── Model/
 │       ├── Species.swift          pet definitions (colours, speed, lines)
 │       ├── Outfit.swift           things to wear and the bond level that unlocks each
-│       └── Dialogue.swift         everything the pet says
+│       ├── Dialogue.swift         everything the pet says
+│       └── Dialogue+Media.swift   what it says about songs, podcasts, videos and films
 ├── Brain/
 │   ├── Brain.swift                PetAction, Brain protocol, MindBrain (the built-in instincts)
 │   └── Mind.swift                 needs, bond and memory (saved between launches)
@@ -194,6 +199,7 @@ Sources/Mochi
 │   ├── Platform.swift             finds window tops to stand on
 │   ├── AudioWatcher.swift         what kind of sound is playing (music / video / call)
 │   ├── NowPlaying.swift           what the system's Now Playing says is playing, and whether it's paused
+│   ├── MediaClassifier.swift      is it a song, a podcast, a film or a video?
 │   ├── SystemInfo.swift           idle time, battery, processor load, key press count
 │   └── CalendarWatcher.swift      upcoming events (only if calendar alerts are on)
 ├── Features/
