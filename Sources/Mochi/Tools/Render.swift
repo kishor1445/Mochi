@@ -61,8 +61,9 @@ enum Render {
     static func media(to path: String) {
         let pets = Species.allCases
         let cell = PetView.side
-        for kind in [MediaActivity.music, .podcast, .video, .movie] {
-            let acts = MediaAct.acts(for: kind)
+        for kind in [MediaActivity.music, .podcast, .video, .movie, .other] {
+            // `.other` stands in for the private-window acts (…-private.png).
+            let acts = kind == .other ? MediaAct.privacy : MediaAct.acts(for: kind)
             let sheet = NSImage(size: NSSize(width: cell * CGFloat(pets.count), height: cell * CGFloat(acts.count)))
             sheet.lockFocus()
             NSColor(calibratedWhite: 0.93, alpha: 1).setFill()
@@ -81,7 +82,8 @@ enum Render {
                 }
             }
             sheet.unlockFocus()
-            write(sheet, to: path.replacingOccurrences(of: "-media.png", with: "-\(kind == .movie ? "movie" : AudioWatcher.name(kind).lowercased()).png"))
+            let name = kind == .other ? "private" : (kind == .movie ? "movie" : AudioWatcher.name(kind).lowercased())
+            write(sheet, to: path.replacingOccurrences(of: "-media.png", with: "-\(name).png"))
         }
     }
 

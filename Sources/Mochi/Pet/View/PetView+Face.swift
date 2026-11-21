@@ -3,6 +3,7 @@ import AppKit
 /// Eyes, cheeks, mouths and eyewear, plus small drawing helpers.
 extension PetView {
     func drawFace(_ body: NSRect) {
+        if hidesFace { return }                 // turned around, giving you some privacy
         let sp = species
         if sp.style == .tough { drawToughFace(body); return }
         let ink = sp.ink

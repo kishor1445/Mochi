@@ -12,6 +12,8 @@ enum MediaAct: String, CaseIterable, Identifiable {
     case phone, snacks, like, subscribe, comments
     // Films and shows
     case cinema, blanket, soda, scary, tearjerker
+    // Something playing in a private window: it politely doesn't look
+    case spy, masquerade, peekaboo, sleepMask, turnAway
 
     var id: String { rawValue }
 
@@ -22,7 +24,29 @@ enum MediaAct: String, CaseIterable, Identifiable {
         case .earbud, .notes, .coffee, .radio, .thinker: return .podcast
         case .phone, .snacks, .like, .subscribe, .comments: return .video
         case .cinema, .blanket, .soda, .scary, .tearjerker: return .movie
+        case .spy, .masquerade, .peekaboo, .sleepMask, .turnAway: return .video
         }
+    }
+
+    /// One of the "I'm not looking!" acts for a private window (picked by browser, not by kind).
+    var isPrivacy: Bool { MediaAct.privacy.contains(self) }
+
+    static let privacy: [MediaAct] = [.spy, .masquerade, .peekaboo, .sleepMask, .turnAway]
+
+    /// Each browser's own act, after its private-mode icon: Chrome's incognito spy, Firefox's mask…
+    static func signature(for browser: MediaClassifier.Browser?) -> MediaAct {
+        switch browser {
+        case .chrome: return .spy
+        case .firefox: return .masquerade
+        case .safari: return .peekaboo
+        case .edge: return .sleepMask
+        default: return .turnAway
+        }
+    }
+
+    /// Another privacy act, never the one it's doing now.
+    static func pickPrivate(after current: MediaAct?) -> MediaAct {
+        privacy.filter { $0 != current }.randomElement() ?? .turnAway
     }
 
     var label: String {
@@ -47,6 +71,11 @@ enum MediaAct: String, CaseIterable, Identifiable {
         case .soda: return "Soda and nachos"
         case .scary: return "Scary scene"
         case .tearjerker: return "Tearjerker"
+        case .spy: return "Spy disguise"
+        case .masquerade: return "Masquerade mask"
+        case .peekaboo: return "Paws over eyes"
+        case .sleepMask: return "Sleep mask and earmuffs"
+        case .turnAway: return "Turned around"
         }
     }
 
@@ -73,6 +102,11 @@ enum MediaAct: String, CaseIterable, Identifiable {
         case .soda: return "watching a film with soda and nachos"
         case .scary: return "hiding behind a cushion during a scary film"
         case .tearjerker: return "crying at a sad film with tissues"
+        case .spy: return "in a spy disguise, not looking at your human's private browsing"
+        case .masquerade: return "behind a mask, not looking at your human's private browsing"
+        case .peekaboo: return "covering your eyes so you don't see your human's private browsing"
+        case .sleepMask: return "in a sleep mask and earmuffs, so your human's private browsing stays private"
+        case .turnAway: return "turned around, giving your human some privacy"
         }
     }
 
@@ -90,7 +124,7 @@ enum MediaAct: String, CaseIterable, Identifiable {
     /// Wears headphones while doing it (the rest of the music acts show off something else instead).
     var wearsHeadphones: Bool { self == .dj }
 
-    static func acts(for kind: MediaActivity) -> [MediaAct] { allCases.filter { $0.kind == kind } }
+    static func acts(for kind: MediaActivity) -> [MediaAct] { allCases.filter { $0.kind == kind && !$0.isPrivacy } }
 
     /// A random act for `kind`, never the one it is doing now.
     static func pick(for kind: MediaActivity, after current: MediaAct? = nil) -> MediaAct? {

@@ -18,6 +18,10 @@ extension Dialogue {
     static func videoNamed(_ channel: String) -> [String] { ["Ooh, \(channel)! 📺", "\(channel)? Good choice 👀"] }
     static let videoGiggle = ["Hahaha 😂", "Hehe, that was funny 😆", "Did you see that?! 😂", "Pfft 😄", "Wow 👀"]
 
+    // Private windows: never anything about what it is
+    static let privateStart = ["I'm not looking! 🙈", "Private time? I'll look away 🙈", "Your secret's safe with me 🤐",
+                               "I didn't see anything 👀❌"]
+
     // Films and shows
     static let movieStart = ["Movie time! 🍿", "Shh, it's starting 🎬", "Lights down, film on 🎬", "Ooh, let's watch! 🍿"]
     static let movieEnd = ["That was a good one 🎬", "Credits! What did you think? 🍿", "Movie's over. Stretch time?"]
@@ -47,6 +51,11 @@ extension Dialogue {
         case .soda: return ["Soda and nachos 🥤", "Cinema snacks! 🧀"]
         case .scary: return ["Is this a scary bit? 😨", "I'm not scared… 😰"]
         case .tearjerker: return ["Don't cry… you cry 🥲", "Pass the tissues 😭"]
+        case .spy: return ["Agent undercover. Saw nothing 🕶", "Incognito mode: engaged 🕵️"]
+        case .masquerade: return ["Mask on. Your secret's safe 🎭", "Who, me? I didn't see a thing 🎭"]
+        case .peekaboo: return ["I'm not looking! 🙈", "Eyes closed, promise 🙈"]
+        case .sleepMask: return ["See nothing, hear nothing 😴", "Earmuffs on! 🙉"]
+        case .turnAway: return ["I'll just face this way… 😗🎶", "Not looking, just whistling ♪"]
         }
     }
 
@@ -61,7 +70,8 @@ extension Dialogue {
             Moment(key: "videoStart", about: "your human started watching a video and you sit down to watch too", lines: videoStart),
             Moment(key: "videoGiggle", about: "something funny or surprising just happened in the video you are watching (a few words)", lines: videoGiggle),
             Moment(key: "movieStart", about: "a film or show is starting and you settle in to watch quietly", lines: movieStart),
-            Moment(key: "movieEnd", about: "the film or show you were watching together just ended", lines: movieEnd)
+            Moment(key: "movieEnd", about: "the film or show you were watching together just ended", lines: movieEnd),
+            Moment(key: "privateStart", about: "your human started something in a private browser window and you cover your eyes to give them privacy", lines: privateStart)
         ] + MediaAct.allCases.map { act in
             Moment(key: "act." + act.rawValue, about: "you start a new thing to do while \(act.doing)", lines: actStart(act))
         }

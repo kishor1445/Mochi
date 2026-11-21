@@ -8,6 +8,8 @@ import AppKit
 /// - video: watching in the screen's glow, giggling, and an act: phone, snacks, like, subscribe, comments
 /// - film or show: quiet and still until it ends, and an act: 3D cinema, blanket, soda, scary, tearjerker
 /// Each pet picks its own act (`MediaAct`) and switches every few minutes, so it never gets old.
+/// In a private window (the browser hides what's playing) it looks away instead, in a way that fits the
+/// browser, and never says, notes or tells the model anything about it.
 /// A call is separate (`onCall`): the pet keeps quiet, but still watches or listens along with you.
 extension PetController {
     /// What's playing, as far as the settings let the pet care. Runs every second, and straight away
@@ -21,9 +23,11 @@ extension PetController {
             onCall = call
             callChanged()
         }
-        if m != media {
+        let secret = m != .none && audio.playingPrivately
+        if m != media || secret != privately {
             let before = media
             media = m
+            privately = secret
             mediaChanged(from: before)
         } else if settings.reactToMedia {
             noticeNewTrack()
@@ -35,6 +39,13 @@ extension PetController {
         let np = audio.playingNow
         playingTitle = np?.title
         nextMediaMoment = Date().addingTimeInterval(.random(in: 40...90))
+        if privately {
+            // Private: no remark about it (not even from the model), nothing for the diary. Just look away.
+            updateBeat()
+            if isMain { say(Dialogue.privateStart.randomElement()!) }
+            if canAct, !userAway { apply(Decision(action: .idle, duration: 4)) }
+            return
+        }
         switch media {
         case .music, .other:
             if !isMain {}
@@ -89,7 +100,7 @@ extension PetController {
 
     /// A new song (or episode) while the same kind of thing keeps playing: now and then it notices.
     func noticeNewTrack() {
-        guard isMain, media == .music || media == .podcast, let np = audio.playingNow, let title = np.title,
+        guard isMain, !privately, media == .music || media == .podcast, let np = audio.playingNow, let title = np.title,
               title != playingTitle else { return }
         let first = playingTitle == nil
         playingTitle = title
@@ -124,7 +135,14 @@ extension PetController {
 
     /// Picks another act for what's playing (or none when nothing is), and says something about it now and then.
     func switchAct(announce: Bool) {
-        let next = MediaAct.pick(for: media, after: view.act)
+        let next: MediaAct?
+        if privately {
+            // The browser's own act first (Chrome's incognito spy, Firefox's mask…), then any of the others.
+            let browser = MediaClassifier.Browser(app: audio.playingNow?.app)
+            next = view.act?.isPrivacy == true ? MediaAct.pickPrivate(after: view.act) : MediaAct.signature(for: browser)
+        } else {
+            next = MediaAct.pick(for: media, after: view.act)
+        }
         view.act = next
         nextActChange = next == nil ? .distantFuture : Date().addingTimeInterval(.random(in: 120...200))
         guard announce, let next, Double.random(in: 0..<1) < 0.5 else { return }
@@ -134,7 +152,11 @@ extension PetController {
     /// Puts the right act on for what's playing (music, podcast, video or film), and the beat for music.
     func updateBeat() {
         let wanted: MediaActivity? = [.music, .podcast, .video, .movie].contains(media) ? media : nil
-        if view.act?.kind != wanted { switchAct(announce: false) }
+        if privately {
+            if view.act?.isPrivacy != true { switchAct(announce: false) }
+        } else if view.act?.kind != wanted || view.act?.isPrivacy == true {
+            switchAct(announce: false)
+        }
 
         let on = hearsMusic
         guard on != (view.musicBpm > 0) else { return }

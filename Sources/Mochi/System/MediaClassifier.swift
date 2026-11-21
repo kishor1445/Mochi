@@ -47,6 +47,39 @@ enum MediaClassifier {
         return minutes >= 20 ? .podcast : .music
     }
 
+    // MARK: Private browsing
+
+    /// Browsers, for private-browsing reactions (each has its own icon for it, so the pet has its own act).
+    enum Browser: Equatable {
+        case chrome, firefox, safari, edge, other
+
+        init?(app: String?) {
+            let a = (app ?? "").lowercased()
+            if a.contains("com.google.chrome") || a.contains("chromium") { self = .chrome }
+            else if a.contains("firefox") || a.contains("mozilla") { self = .firefox }
+            else if a.contains("com.apple.safari") || a.contains("safaritechnologypreview") { self = .safari }
+            else if a.contains("com.microsoft.edge") { self = .edge }
+            else if ["brave", "company.thebrowser", "opera", "vivaldi", "orion", "app.zen-browser", "duckduckgo", "sigmaos", "yandex"]
+                        .contains(where: { a.contains($0) }) { self = .other }
+            else { return nil }
+        }
+    }
+
+    /// Something is playing in a private window. Browsers keep private media to themselves: instead of the
+    /// real title they report a placeholder ("A site is playing media" in Chrome and other Chromium browsers)
+    /// and no artist. That placeholder is the tell, so no permission is needed to notice it.
+    static func isPrivate(app: String?, title: String?, artist: String?) -> Bool {
+        guard Browser(app: app) != nil else { return false }
+        let t = (title ?? "").lowercased().trimmingCharacters(in: .whitespaces)
+        if privatePlaceholders.contains(where: { t == $0 || t.hasPrefix($0) }) { return true }
+        // "<Something> is playing media / audio / a video", with nothing about who made it.
+        let empty = (artist ?? "").trimmingCharacters(in: .whitespaces).isEmpty
+        return empty && t.range(of: #"\bis playing (media|audio|video|a video|sound)\b"#, options: .regularExpression) != nil
+    }
+
+    static let privatePlaceholders = ["a site is playing media", "a site is playing audio", "a site is playing video",
+                                      "this site is playing media", "a page is playing media", "media is playing"]
+
     // MARK: Clues
 
     static let podcastApps = ["com.apple.podcasts", "pocketcasts", "shiftyjelly", "overcast", "castro", "audible",

@@ -222,7 +222,7 @@ enum LogicTest {
         for kind in [MediaActivity.music, .podcast, .video, .movie] {
             check("\(AudioWatcher.name(kind).lowercased()) has five acts", MediaAct.acts(for: kind).count == 5)
         }
-        check("every act belongs to exactly one kind", MediaAct.allCases.count == 20)
+        check("every act belongs to exactly one kind (plus five for private windows)", MediaAct.allCases.count == 25 && MediaAct.privacy.count == 5)
         var repeats = 0
         for act in MediaAct.allCases { for _ in 0..<50 where MediaAct.pick(for: act.kind, after: act) == act { repeats += 1 } }
         check("switching acts never picks the same one again", repeats == 0)
@@ -238,6 +238,7 @@ enum LogicTest {
         a.nextActChange = .distantPast
         a.mediaTick(Date())
         check("after a few minutes it moves on to another act", a.view.act != firstAct && a.view.act?.kind == .music)
+        a.view.angle = 0                       // upright: props are put away on walls and the ceiling
         a.view.act = .karaoke; a.view.mood = .idle
         check("singing karaoke it shows the mic, not headphones", a.view.showsAct && !(a.view.act?.wearsHeadphones ?? true))
         a.view.act = .dj
@@ -249,6 +250,35 @@ enum LogicTest {
         a.view.mood = .idle
         a.media = .none; a.mediaChanged()
         check("when nothing plays there's no act", a.view.act == nil)
+
+        print("--- Private windows ---")
+        let chromeID = "com.google.Chrome"
+        check("Chrome's incognito placeholder counts as private", MediaClassifier.isPrivate(app: chromeID, title: "A site is playing media", artist: ""))
+        check("…even before the artist has cleared", MediaClassifier.isPrivate(app: chromeID, title: "A site is playing media", artist: "MoreSidemen"))
+        check("a normal YouTube video isn't private", !MediaClassifier.isPrivate(app: chromeID, title: "SIDEMEN GTA V BINGO", artist: "MoreSidemen"))
+        check("another browser's placeholder counts too", MediaClassifier.isPrivate(app: "org.mozilla.firefox", title: "Firefox is playing media", artist: nil))
+        check("a song that happens to say 'is playing' isn't private", !MediaClassifier.isPrivate(app: chromeID, title: "My heart is playing music", artist: "Some Band"))
+        check("only browsers have private windows", !MediaClassifier.isPrivate(app: "com.spotify.client", title: "A site is playing media", artist: ""))
+        let signatures: [(String, MediaAct)] = [(chromeID, .spy), ("org.mozilla.firefox", .masquerade), ("com.apple.Safari", .peekaboo),
+                                                ("com.microsoft.edgemac", .sleepMask), ("com.brave.Browser", .turnAway)]
+        check("each browser starts with its own act (Chrome spy, Firefox mask, Safari paws, Edge sleep mask, others turn around)",
+              signatures.allSatisfy { MediaAct.signature(for: MediaClassifier.Browser(app: $0.0)) == $0.1 })
+        var privateRepeats = 0
+        for act in MediaAct.privacy { for _ in 0..<40 where MediaAct.pickPrivate(after: act) == act { privateRepeats += 1 } }
+        check("it moves on to the other privacy acts without repeating", privateRepeats == 0)
+
+        a.media = .video; a.privately = true; a.mediaChanged()
+        check("something private playing: it looks away", a.view.act?.isPrivacy == true, a.view.act?.label ?? "none")
+        check("…and the model hears nothing about what it is", a.happeningNow.contains("private window") && !a.happeningNow.contains("video"))
+        a.nextActChange = .distantPast
+        let firstCover = a.view.act
+        a.mediaTick(Date())
+        check("…switching to another way of not looking after a while", a.view.act?.isPrivacy == true && a.view.act != firstCover)
+        a.view.act = .turnAway; a.view.mood = .idle; a.view.angle = 0
+        check("turned around, its face is hidden", a.view.hidesFace)
+        a.privately = false; a.mediaChanged()
+        check("back in a normal window, a normal video act again", a.view.act?.isPrivacy == false && a.view.act?.kind == .video)
+        a.media = .none; a.mediaChanged()
 
         var settle = AudioWatcher.Settle()
         let t0 = Date()

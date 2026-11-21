@@ -13,6 +13,12 @@ extension PetController {
     /// What is going on on the Mac right now (music, a call, a focus session), or "".
     var happeningNow: String {
         var parts: [String] = []
+        // In a private window the model hears only that much: nothing about what it is.
+        if privately {
+            parts.append("Your human is watching something in a private window; you're politely looking away and don't ask about it.")
+            if onCall { parts.append("Your human is on a call.") }
+            return parts.joined(separator: " ")
+        }
         switch media {
         case .music: parts.append("Music is playing\(describe(audio.playingNow)).")
         case .podcast: parts.append("Your human is listening to a podcast\(describe(audio.playingNow)).")

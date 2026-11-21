@@ -32,6 +32,9 @@ final class NowPlaying {
 
         /// What kind of thing this is: a song, a podcast, a film, a YouTube video…
         var kind: MediaClassifier.Kind { MediaClassifier.kind(of: self) }
+
+        /// Playing in a private (incognito) window: the browser hides what it is.
+        var isPrivate: Bool { MediaClassifier.isPrivate(app: app, title: title, artist: artist) }
     }
 
     /// The latest report, or nil while it isn't known (not started, or the helper can't run on this Mac).

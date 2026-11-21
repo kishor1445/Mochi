@@ -162,6 +162,9 @@ final class AudioWatcher {
         }
     }
 
+    /// Something is playing in a private browser window (see `MediaClassifier.isPrivate`).
+    var playingPrivately: Bool { playingNow?.isPrivate ?? false }
+
     /// The Now Playing item behind `current`, while something is playing: the app, title and artist.
     var playingNow: NowPlaying.State? {
         guard let np = nowPlaying.state, np.playing, current != .none, current != .other else { return nil }
@@ -176,7 +179,9 @@ final class AudioWatcher {
             let who = np.name ?? np.app ?? "Something"
             if let kind = kind(of: np) {
                 found.insert(kind)
-                seen.append("Now Playing: \(who) (\(Self.name(kind).lowercased()))\(np.title.map { ", " + $0 } ?? "")")
+                // Private windows: never the title, just that it's private.
+                let what = np.isPrivate ? ", in a private window" : (np.title.map { ", " + $0 } ?? "")
+                seen.append("Now Playing: \(who) (\(Self.name(kind).lowercased()))\(what)")
             } else {
                 seen.append(np.app == nil ? "Now Playing: nothing" : "Now Playing: \(who), paused")
             }

@@ -30,6 +30,7 @@ extension PetView {
         case .soda: drawSoda(body)
         case .scary: drawCushion(body)
         case .tearjerker: drawTissues(body)
+        case .spy, .masquerade, .peekaboo, .sleepMask, .turnAway: drawPrivacy(body)
         }
     }
 
@@ -37,6 +38,7 @@ extension PetView {
     func drawActEyes(fx: CGFloat, spread: CGFloat, eyeY: CGFloat) -> Bool {
         drawScreenReflection(fx: fx, spread: spread, eyeY: eyeY)
         guard let act, mood != .sleep else { return false }
+        if act.isPrivacy, showsAct { return drawPrivacyEyes(fx: fx, spread: spread, eyeY: eyeY) }
         switch act {
         case .cinema:
             draw3DGlasses(fx: fx, spread: spread, eyeY: eyeY)
@@ -51,6 +53,7 @@ extension PetView {
 
     /// Light falling on the body (drawn while the body is the clip): the screen's glow, rave lights.
     func drawActLight(_ body: NSRect) {
+        drawBackFur(body)
         drawScreenGlow(body)
         if act == .rave, showsAct { drawRaveLight(body) }
     }
