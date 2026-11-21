@@ -8,7 +8,7 @@ extension PetView {
     /// A turntable deck on the floor: one paw scratches the record, the other rides the mixer.
     func drawDJ(_ body: NSRect) {
         let floor = groundY(body)
-        local(NSPoint(x: body.midX, y: floor)) {
+        local(NSPoint(x: body.midX, y: floor), scale: 1.2) {
             let deck = roundRect(NSRect(x: -25, y: 0, width: 50, height: 11), 3.5)
             paint(deck, rgb(0.18, 0.18, 0.23), ink, 1.4)
             paint(roundRect(NSRect(x: -23, y: 1.5, width: 46, height: 2), 1), rgb(0.30, 0.30, 0.36))
@@ -31,16 +31,16 @@ extension PetView {
             paint(circle(NSPoint(x: -14, y: 8.6), 1.4), on ? rgb(0.3, 0.2, 0.25) : rgb(1, 0.35, 0.45))
         }
         // Scratching back and forth on the record; the other paw on the mixer, bobbing to the beat.
-        paw(NSPoint(x: body.midX + facing * (9.5 + sin(time * 7) * 4.5), y: floor + 13))
-        paw(NSPoint(x: body.midX - facing * 15, y: floor + 11.5 + beatPulse * 1.5))
+        paw(NSPoint(x: body.midX + facing * (11.5 + sin(time * 7) * 5.5), y: floor + 15.5))
+        paw(NSPoint(x: body.midX - facing * 18, y: floor + 13.5 + beatPulse * 1.5))
     }
 
     // MARK: Air guitar
 
     /// A little red electric guitar across the tummy, neck up and forward, strummed on the beat.
     func drawAirGuitar(_ body: NSRect) {
-        let centre = NSPoint(x: body.midX - facing * 5, y: body.minY + body.height * 0.22)
-        local(centre, angle: 0.5) {
+        let centre = NSPoint(x: body.midX - facing * 8, y: body.minY + body.height * 0.2)
+        local(centre, angle: 0.5, scale: 1.4) {
             // Neck and headstock.
             paint(roundRect(NSRect(x: 8, y: -1.7, width: 27, height: 3.4), 1), rgb(0.60, 0.40, 0.22), ink, 1)
             rgb(0.85, 0.78, 0.6).setStroke()
@@ -79,7 +79,7 @@ extension PetView {
     func drawKaraoke(_ body: NSRect) {
         let mouth = mouthPoint(body)
         let head = NSPoint(x: mouth.x + facing * 7.5, y: mouth.y - 3 + beatPulse * 1.2)
-        local(head, angle: -1.15) {
+        local(head, angle: -1.15, scale: 1.2) {
             paint(roundRect(NSRect(x: 3, y: -2.2, width: 15, height: 4.4), 2), rgb(0.16, 0.16, 0.2), ink, 1)
             paint(roundRect(NSRect(x: 2.5, y: -2.8, width: 2.4, height: 5.6), 1), rgb(0.75, 0.75, 0.8))
             paint(circle(.zero, 4.8), rgb(0.72, 0.74, 0.8), ink, 1.1)
@@ -97,7 +97,7 @@ extension PetView {
         let words = ["la la", "♪", "ooh~", "♫"]
         if let t = moment(every: 2.4, lasting: 2.4) {
             let word = words[Int(time / 2.4) % words.count]
-            label(word, at: NSPoint(x: mouth.x + facing * (16 + t * 9), y: mouth.y + 8 + t * 16), size: 9,
+            label(word, at: NSPoint(x: body.midX + facing * (body.width / 2 + 2 + t * 4), y: body.maxY - 8 + t * 16), size: 9,
                   color: rgb(0.95, 0.35, 0.6, fade(t)), weight: .bold)
         }
     }
@@ -107,15 +107,15 @@ extension PetView {
     /// A neon glow stick in each paw, waving on the beat, with the colours washing over the pet.
     func drawRave(_ body: NSRect) {
         for side in [CGFloat(-1), 1] {
-            let hand = handPoint(body, side: side, height: 0.36)
+            let hand = handPoint(body, side: side, height: 0.42)
             let wave = 0.45 + 0.4 * sin(beatPhase * 2 + (side > 0 ? 0 : .pi))
             let colour = side > 0 ? rgb(0.35, 1, 0.45) : rgb(1, 0.35, 0.88)
             local(hand, angle: .pi / 2 - side * wave) {
-                for (width, c) in [(CGFloat(9), colour.withAlphaComponent(0.22)), (4.4, colour), (1.4, NSColor.white.withAlphaComponent(0.85))] {
-                    let stick = NSBezierPath(); stick.move(to: NSPoint(x: 2, y: 0)); stick.line(to: NSPoint(x: 19, y: 0))
+                for (width, c) in [(CGFloat(12), colour.withAlphaComponent(0.25)), (5.5, colour), (1.8, NSColor.white.withAlphaComponent(0.85))] {
+                    let stick = NSBezierPath(); stick.move(to: NSPoint(x: 2, y: 0)); stick.line(to: NSPoint(x: 26, y: 0))
                     stick.lineWidth = width; stick.lineCapStyle = .round; c.setStroke(); stick.stroke()
                 }
-                paw(.zero, 4.2)
+                paw(.zero, 4.6)
             }
         }
     }
@@ -134,7 +134,7 @@ extension PetView {
     /// A pair of bongos on the floor, tapped with alternate paws, each tap ringing out.
     func drawBongos(_ body: NSRect) {
         let floor = groundY(body)
-        let drums: [(x: CGFloat, top: CGFloat, w: CGFloat)] = [(body.midX - facing * 9.5, 13, 16), (body.midX + facing * 9.5, 11.5, 14)]
+        let drums: [(x: CGFloat, top: CGFloat, w: CGFloat)] = [(body.midX - facing * 12, 17, 21), (body.midX + facing * 12, 15, 18)]
         let hit = sin(beatPhase * 2)
         for (i, d) in drums.enumerated() {
             let top = floor + d.top

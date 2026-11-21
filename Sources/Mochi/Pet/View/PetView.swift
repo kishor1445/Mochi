@@ -131,6 +131,7 @@ final class PetView: NSView {
         ctx.scaleBy(x: bounds.width / Self.side, y: bounds.height / Self.side)
         ctx.saveGState()
         if shiver, mood != .sleep { ctx.translateBy(x: sin(time * 46) * 1.1, y: 0) }
+        if actShake != 0 { ctx.translateBy(x: actShake, y: 0) }
         ctx.translateBy(x: Self.canvas.midX, y: Self.canvas.midY)
         ctx.rotate(by: angle)
         ctx.translateBy(x: -Self.canvas.midX, y: -Self.canvas.midY)
@@ -149,6 +150,7 @@ final class PetView: NSView {
         }
         // Grooving along: a gentle side-to-side sway in time with the music.
         if vibing { sway += sin(beatPhase) * (mood == .walk ? 0.05 : 0.08) }
+        sway += actSway
         if sway != 0 {
             ctx.translateBy(x: Self.canvas.midX, y: 8)
             ctx.rotate(by: sway)

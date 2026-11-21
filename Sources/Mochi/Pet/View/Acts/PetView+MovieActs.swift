@@ -98,17 +98,18 @@ extension PetView {
         paint(NSBezierPath(ovalIn: NSRect(x: tray.x - 12, y: tray.y - 3, width: 24, height: 7)), rgb(0.93, 0.93, 0.96), ink, 1.2)
 
         // The soda, held on the near side, straw up to the mouth.
-        let cup = handPoint(body, side: 1, height: 0.20)
+        // Held up beside the face, so the straw is a short hop to the mouth.
         let mouth = mouthPoint(body)
+        let cup = NSPoint(x: mouth.x + facing * 15, y: max(mouth.y - 14, groundY(body) + 10))
         let lidY = cup.y + 9
-        let straw = NSBezierPath(); straw.move(to: NSPoint(x: cup.x, y: lidY)); straw.line(to: NSPoint(x: cup.x, y: lidY + 6))
-        straw.line(to: NSPoint(x: mouth.x + facing * 3, y: mouth.y - 1))
+        let straw = NSBezierPath(); straw.move(to: NSPoint(x: cup.x, y: lidY)); straw.line(to: NSPoint(x: cup.x, y: lidY + 4))
+        straw.line(to: NSPoint(x: mouth.x + facing * 4, y: mouth.y))
         straw.lineWidth = 3.6; straw.lineCapStyle = .round; straw.lineJoinStyle = .round; ink.setStroke(); straw.stroke()
         straw.lineWidth = 2; rgb(0.95, 0.30, 0.35).setStroke(); straw.stroke()
         if let s = moment(every: 6, lasting: 1.6, offset: 1) {
             for i in 0..<3 {
                 let f = min(1, max(0, s * 1.4 - CGFloat(i) * 0.15))
-                let p = f < 0.5 ? NSPoint(x: cup.x, y: lidY + f * 12) : NSPoint(x: cup.x + (mouth.x + facing * 3 - cup.x) * (f - 0.5) * 2, y: lidY + 6 + (mouth.y - 1 - lidY - 6) * (f - 0.5) * 2)
+                let p = f < 0.5 ? NSPoint(x: cup.x, y: lidY + f * 8) : NSPoint(x: cup.x + (mouth.x + facing * 4 - cup.x) * (f - 0.5) * 2, y: lidY + 4 + (mouth.y - lidY - 4) * (f - 0.5) * 2)
                 paint(circle(p, 0.8), rgb(0.45, 0.25, 0.15, f < 1 ? 1 : 0))
             }
         }
@@ -142,7 +143,9 @@ extension PetView {
         let top = peek + (hide - peek) * scaredJump
         let w = min(body.width * 0.8, 58)
         let cx = faceX(body)
-        let r = NSRect(x: cx - w / 2, y: groundY(body) - 1, width: w, height: top - groundY(body) + 1)
+        // Held up in front of the face: from the floor on a small pet, a cushion's height below the eyes on a tall one.
+        let bottom = max(groundY(body) - 1, top - 34)
+        let r = NSRect(x: cx - w / 2, y: bottom, width: w, height: top - bottom)
         // Tassels on the top corners, then the cushion, softly puffed.
         for side in [CGFloat(-1), 1] {
             paint(circle(NSPoint(x: cx + side * (w / 2 - 1), y: top - 1), 2.2), rgb(1, 0.82, 0.3), ink, 0.9)
@@ -169,7 +172,7 @@ extension PetView {
     func drawTissues(_ body: NSRect) {
         let floor = groundY(body)
         let box = NSPoint(x: body.midX + facing * (body.width / 2 - 8), y: floor)
-        local(box) {
+        local(box, scale: 1.3) {
             let b = roundRect(NSRect(x: -10.5, y: 0, width: 21, height: 11), 1.8)
             paint(b, rgb(0.62, 0.80, 0.98), ink, 1.2)
             for (fx, fy) in [(CGFloat(-6), CGFloat(3.5)), (0, 6.5), (6, 3)] { paint(circle(NSPoint(x: fx, y: fy), 1.6), rgb(1, 1, 1, 0.75)) }
@@ -182,7 +185,7 @@ extension PetView {
             paint(tissue, .white, rgb(0.6, 0.65, 0.75), 0.9)
         }
         // The dab: up to the eye with a tissue, a little wipe, back down.
-        let rest = NSPoint(x: box.x - facing * 6, y: floor + 15)
+        let rest = NSPoint(x: box.x - facing * 8, y: floor + 19)
         var p = rest
         var dabbing = false
         if let t = moment(every: 6, lasting: 2, offset: 3) {

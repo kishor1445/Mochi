@@ -37,9 +37,9 @@ extension PetView {
         }
         squash -= impact * 0.16
         lift += hop
-        // Listening to a podcast: a slow nod. Watching a film: chewing popcorn.
-        lift += listeningNod
-        if munching { squash += sin(t * 20) * 0.02 }
+        // Whatever it's up to while something plays: nodding along, chewing, jumping at a scary bit.
+        lift += actLift
+        squash += actSquash
         // Ghosts float.
         let hover: CGFloat = sp == .ghost ? (mood == .sleep ? 1 : 7 + sin(t * 3) * 2.5) : 0
 
@@ -89,7 +89,7 @@ extension PetView {
         }
         if sp.style == .tough { drawToughMarkings(body) }
         drawShading(body)
-        drawScreenGlow(body)
+        drawActLight(body)
         NSGraphicsContext.restoreGraphicsState()
         sp.outline.setStroke()
         path.lineWidth = sp.style == .tough ? 3 : 2.5
@@ -101,11 +101,11 @@ extension PetView {
 
         drawFace(body)
         drawOutfit(ctx, body)
-        drawPodcastGear(body)
-        drawPopcorn(body)
+        drawAct(body)
         if mood == .power { drawPower(body) }
         if sweat, mood != .sleep { drawSweat(body) }
-        if musicBpm > 0 { drawHeadphones(body) }
+        // Headphones, unless the act shows off something else (a guitar, a mic, glow sticks…).
+        if musicBpm > 0, act?.wearsHeadphones ?? true || !showsAct { drawHeadphones(body) }
         if mood == .sleep { drawZs(near: body) }
         if mood == .dance || (musicBpm > 0 && mood != .sleep) { drawNotes(near: body) }
     }

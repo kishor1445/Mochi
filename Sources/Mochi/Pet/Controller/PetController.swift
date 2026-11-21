@@ -117,6 +117,7 @@ final class PetController {
     var onCall = false                      // a call is on (and "Stay quiet during calls" is on): keep quiet
     var playingTitle: String?               // the song or show last reacted to, so a new one is noticed
     var nextMediaMoment = Date.distantFuture   // the next little reaction to a podcast or video
+    var nextActChange = Date.distantFuture     // when it switches to another act for what's playing (MediaAct)
     var userAway = false
     var activeSeconds: TimeInterval = 0
     var lastSlow = Date.distantPast

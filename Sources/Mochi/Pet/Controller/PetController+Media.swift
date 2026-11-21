@@ -3,10 +3,11 @@ import AppKit
 /// Reacting to what is playing on the Mac. `AudioWatcher` says what kind of thing it is (music, a podcast,
 /// a video, a film or a show, a call) and `NowPlaying` what exactly; this decides how the pet takes it:
 ///
-/// - music: headphones on, vibing along while it goes about its day, a proper dance now and then
-/// - podcast: one earbud in, nodding along, the odd "mm-hmm"
-/// - video: sits down to watch in the screen's glow, giggles now and then
-/// - film or show: 3D glasses and popcorn, quiet and still until it ends
+/// - music: vibing along while it goes about its day, and an act: DJ, air guitar, karaoke, rave, bongos
+/// - podcast: calm, the odd "mm-hmm", and an act: earbud, notes, coffee, radio, deep thinking
+/// - video: watching in the screen's glow, giggling, and an act: phone, snacks, like, subscribe, comments
+/// - film or show: quiet and still until it ends, and an act: 3D cinema, blanket, soda, scary, tearjerker
+/// Each pet picks its own act (`MediaAct`) and switches every few minutes, so it never gets old.
 /// A call is separate (`onCall`): the pet keeps quiet, but still watches or listens along with you.
 extension PetController {
     /// What's playing, as far as the settings let the pet care. Runs every second, and straight away
@@ -57,7 +58,7 @@ extension PetController {
             if canAct, !userAway { apply(Decision(action: .idle, duration: 5)) }
         case .movie:
             // The one thing it says before going quiet for the film (force: films silence the pet).
-            if isMain { react("Your human started watching a film or show\(describe(np)); you put on 3D glasses and grab popcorn",
+            if isMain { react("Your human started watching a film or show\(describe(np)); you're watching too\(view.act.map { ", " + $0.doing } ?? "")",
                               fallback: Dialogue.movieStart.randomElement()!, force: true, note: true) }
             if canAct, !userAway { apply(Decision(action: .idle, duration: 6)) }
         case .call:
@@ -92,12 +93,16 @@ extension PetController {
               title != playingTitle else { return }
         let first = playingTitle == nil
         playingTitle = title
-        guard !first, media == .music, Double.random(in: 0..<1) < 0.3 else { return }
+        guard !first else { return }
+        // A new song is a good moment for a new act.
+        if media == .music, Double.random(in: 0..<1) < 0.4 { switchAct(announce: false) }
+        guard media == .music, Double.random(in: 0..<1) < 0.3 else { return }
         react("The next song just started\(describe(np))", fallback: Dialogue.newSong.randomElement()!)
     }
 
     /// Little reactions while a podcast or a video plays: a nod and a word, a giggle. Once a second.
     func mediaTick(_ now: Date) {
+        if now >= nextActChange, view.act != nil { switchAct(announce: true) }
         guard now >= nextMediaMoment else { return }
         nextMediaMoment = now.addingTimeInterval(.random(in: 45...120))
         guard isMain || Bool.random(), canAct, !userAway, action == .idle || action == .lookAround || { if case .walk = action { return true }; return false }() else { return }
@@ -117,17 +122,19 @@ extension PetController {
     /// (say, a Discord voice channel with Spotify playing): the vibe is only visual, and the pet stays quiet.
     var hearsMusic: Bool { media == .music || media == .other }
 
-    /// Puts the right things on for what's playing: headphones for music; an earbud, the screen's glow
-    /// or 3D glasses and popcorn for the rest.
+    /// Picks another act for what's playing (or none when nothing is), and says something about it now and then.
+    func switchAct(announce: Bool) {
+        let next = MediaAct.pick(for: media, after: view.act)
+        view.act = next
+        nextActChange = next == nil ? .distantFuture : Date().addingTimeInterval(.random(in: 120...200))
+        guard announce, let next, Double.random(in: 0..<1) < 0.5 else { return }
+        say(Dialogue.actStart(next).randomElement()!)
+    }
+
+    /// Puts the right act on for what's playing (music, podcast, video or film), and the beat for music.
     func updateBeat() {
-        let gear: MediaGear
-        switch media {
-        case .podcast: gear = .podcast
-        case .video: gear = .video
-        case .movie: gear = .movie
-        default: gear = .none
-        }
-        if view.watching != gear { view.watching = gear }
+        let wanted: MediaActivity? = [.music, .podcast, .video, .movie].contains(media) ? media : nil
+        if view.act?.kind != wanted { switchAct(announce: false) }
 
         let on = hearsMusic
         guard on != (view.musicBpm > 0) else { return }

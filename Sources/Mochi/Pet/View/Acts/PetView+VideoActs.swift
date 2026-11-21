@@ -45,30 +45,31 @@ extension PetView {
     func drawSnacks(_ body: NSRect) {
         let floor = groundY(body)
         let bowl = NSPoint(x: body.midX + facing * 6, y: floor)
+        let k: CGFloat = 1.3
         let mouth = mouthPoint(body)
         // Chips first, so the bowl's front covers their bottoms.
         let chips: [(CGFloat, CGFloat, CGFloat)] = [(-9, 9, -0.5), (-3, 11, 0.3), (3, 10, -0.2), (9, 9, 0.6), (0, 8, 0.1)]
         for (dx, h, tilt) in chips {
-            local(NSPoint(x: bowl.x + dx * facing, y: bowl.y + h - 2), angle: tilt) {
+            local(NSPoint(x: bowl.x + dx * k * facing, y: bowl.y + (h - 2) * k), angle: tilt, scale: k) {
                 let chip = NSBezierPath(); chip.move(to: NSPoint(x: -3.6, y: -2.5)); chip.line(to: NSPoint(x: 3.6, y: -2.5)); chip.line(to: NSPoint(x: 0.4, y: 4)); chip.close()
                 paint(chip, rgb(1, 0.78, 0.25), rgb(0.75, 0.45, 0.1), 0.9)
                 paint(circle(NSPoint(x: -0.6, y: -0.4), 0.5), rgb(0.85, 0.35, 0.15))
             }
         }
-        let rim = NSRect(x: bowl.x - 15, y: bowl.y + 4, width: 30, height: 6)
+        let rim = NSRect(x: bowl.x - 19.5, y: bowl.y + 6, width: 39, height: 6)
         let shell = NSBezierPath()
         shell.move(to: NSPoint(x: rim.minX, y: rim.midY))
-        shell.curve(to: NSPoint(x: rim.maxX, y: rim.midY), controlPoint1: NSPoint(x: rim.minX + 2, y: bowl.y - 3), controlPoint2: NSPoint(x: rim.maxX - 2, y: bowl.y - 3))
+        shell.curve(to: NSPoint(x: rim.maxX, y: rim.midY), controlPoint1: NSPoint(x: rim.minX + 2, y: bowl.y - 4), controlPoint2: NSPoint(x: rim.maxX - 2, y: bowl.y - 4))
         shell.close()
         paint(shell, rgb(0.36, 0.56, 0.96), ink, 1.3)
-        paint(NSBezierPath(rect: NSRect(x: rim.minX + 3, y: bowl.y + 3.4, width: 24, height: 1.4)), NSColor.white.withAlphaComponent(0.6))
+        paint(NSBezierPath(rect: NSRect(x: rim.minX + 4, y: bowl.y + 4.4, width: 31, height: 1.6)), NSColor.white.withAlphaComponent(0.6))
 
         // The grab: down into the bowl, up to the mouth with a chip, back again.
         let rest = handPoint(body, side: 1, height: 0.24)
         var p = rest
         var holding = false
         if let t = moment(every: 5, lasting: 2.2) {
-            let dip = NSPoint(x: bowl.x + facing * 4, y: bowl.y + 9)
+            let dip = NSPoint(x: bowl.x + facing * 5, y: bowl.y + 12)
             let eat = NSPoint(x: mouth.x + facing * 5, y: mouth.y - 3)
             func lerp(_ a: NSPoint, _ b: NSPoint, _ f: CGFloat) -> NSPoint { NSPoint(x: a.x + (b.x - a.x) * f, y: a.y + (b.y - a.y) * f) }
             if t < 0.3 { p = lerp(rest, dip, t / 0.3) }
@@ -102,7 +103,7 @@ extension PetView {
             up *= 1 + 0.12 * sin(t * 30) * (t < 0.3 ? 1 : 0)       // a little bounce as it goes up
         }
         let length = 11 + 9 * up
-        local(hand, angle: 0.18 - 0.12 * up) {
+        local(hand, angle: 0.18 - 0.12 * up, scale: 1.35) {
             paint(roundRect(NSRect(x: -1, y: 0, width: 2.2, height: length), 1), rgb(0.70, 0.50, 0.30), ink, 0.9)
             let r = 6.5 + 2 * up
             let centre = NSPoint(x: 0, y: length + r - 1)
@@ -122,7 +123,7 @@ extension PetView {
         guard up > 0.6 else { return }
         for i in 0..<3 {
             let a = time * 3 + CGFloat(i) * 2.1
-            let sp = NSPoint(x: hand.x + facing * 2 + cos(a) * 13, y: hand.y + 30 + sin(a) * 9)
+            let sp = NSPoint(x: hand.x + facing * 3 + cos(a) * 15, y: hand.y + 38 + sin(a) * 10)
             label("✦", at: sp, size: 6, color: rgb(1, 0.8, 0.25, up), weight: .bold)
         }
     }
@@ -132,22 +133,22 @@ extension PetView {
     /// A red SUBSCRIBE button on the floor; now and then a paw presses it, it turns grey and the bell rings.
     func drawSubscribe(_ body: NSRect) {
         let floor = groundY(body)
-        let button = NSPoint(x: body.midX + facing * 4, y: floor + 5.5)
+        let button = NSPoint(x: body.midX + facing * 2, y: floor + 6.5)
         var press: CGFloat = 0
         var subscribed = false
         if let t = moment(every: 9, lasting: 4.5, offset: 2) {
             press = t < 0.12 ? sin(t / 0.12 * .pi) : 0
             subscribed = t > 0.08
         }
-        let pill = roundRect(NSRect(x: button.x - 18, y: button.y - 5.5 - press, width: 36, height: 11), 5.5)
+        let pill = roundRect(NSRect(x: button.x - 21, y: button.y - 6.5 - press, width: 42, height: 13), 6.5)
         paint(pill, subscribed ? rgb(0.62, 0.62, 0.66) : rgb(0.93, 0.14, 0.18), ink, 1.3)
-        label(subscribed ? "SUBSCRIBED" : "SUBSCRIBE", at: NSPoint(x: button.x, y: button.y - press), size: 5.3,
+        label(subscribed ? "SUBSCRIBED" : "SUBSCRIBE", at: NSPoint(x: button.x, y: button.y - press), size: 6.2,
               color: .white, weight: .black)
 
         // The bell, forward of the button; it swings and rings once subscribed.
-        let bell = NSPoint(x: button.x + facing * 25, y: floor + 9)
+        let bell = NSPoint(x: min(max(button.x + facing * 28, 9), Self.side - 9), y: floor + 11)
         let swing = subscribed ? sin(time * 22) * 0.35 * max(0, 1 - (moment(every: 9, lasting: 4.5, offset: 2) ?? 1)) : 0
-        local(bell, angle: swing) {
+        local(bell, angle: swing, scale: 1.3) {
             let shape = NSBezierPath()
             shape.move(to: NSPoint(x: -5.5, y: -3))
             shape.curve(to: NSPoint(x: 0, y: 6), controlPoint1: NSPoint(x: -5, y: 2), controlPoint2: NSPoint(x: -4, y: 6))
@@ -173,7 +174,7 @@ extension PetView {
     func drawComments(_ body: NSRect) {
         let floor = groundY(body)
         let base = NSPoint(x: body.midX + facing * 3, y: floor)
-        local(base) {
+        local(base, scale: 1.25) {
             // The lid, seen from behind (the screen faces the pet), and the keyboard deck in front.
             let lid = roundRect(NSRect(x: -14, y: 4, width: 28, height: 17), 2.2)
             paint(lid, rgb(0.80, 0.82, 0.88), ink, 1.3)
@@ -190,14 +191,14 @@ extension PetView {
         }
         // Typing: paws bouncing in turn.
         let tap = sin(time * 16)
-        paw(NSPoint(x: base.x - 7, y: floor + 6.5 + max(0, tap) * 2.5), 4)
-        paw(NSPoint(x: base.x + 7, y: floor + 6.5 + max(0, -tap) * 2.5), 4)
+        paw(NSPoint(x: base.x - 9, y: floor + 7.5 + max(0, tap) * 2.5), 4.4)
+        paw(NSPoint(x: base.x + 9, y: floor + 7.5 + max(0, -tap) * 2.5), 4.4)
 
         // Comments, posted one after another.
         let posts = ["lol", "first!", "😂", "W", "+1", "so true", "🔥"]
         guard let t = moment(every: 2.8, lasting: 2.8) else { return }
         let text = posts[Int(time / 2.8) % posts.count]
-        let p = NSPoint(x: base.x + facing * (12 + t * 6), y: floor + 26 + t * 14)
+        let p = NSPoint(x: min(max(body.midX + facing * (body.width / 2 + t * 4), 16), Self.side - 16), y: min(body.maxY - 6 + t * 16, Self.side - 8))
         let attrs: [NSAttributedString.Key: Any] = [.font: NSFont.systemFont(ofSize: 6.5, weight: .bold)]
         let w = (text as NSString).size(withAttributes: attrs).width
         let bubble = roundRect(NSRect(x: p.x - w / 2 - 3.5, y: p.y - 5, width: w + 7, height: 10), 4)

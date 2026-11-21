@@ -17,11 +17,12 @@ extension PetController {
         case .music: parts.append("Music is playing\(describe(audio.playingNow)).")
         case .podcast: parts.append("Your human is listening to a podcast\(describe(audio.playingNow)).")
         case .video: parts.append("Your human is watching a video\(describe(audio.playingNow)).")
-        case .movie: parts.append("Your human is watching a film or show\(describe(audio.playingNow)); you are watching too, in 3D glasses with popcorn.")
+        case .movie: parts.append("Your human is watching a film or show\(describe(audio.playingNow)); you are watching too.")
         case .call: break
         case .other: parts.append("Some sound is playing\(soundSource).")
         case .none: break
         }
+        if let act = view.act, act.kind == media { parts.append("Right now you are \(act.doing).") }
         if onCall { parts.append("Your human is on a call.") }
         if focusing { parts.append("A focus session is running.") }
         return parts.joined(separator: " ")

@@ -152,8 +152,8 @@ extension PetView {
     /// Shades and glasses sit over the eyes, so they are drawn with the face.
     func drawEyewear(fx: CGFloat, spread: CGFloat, eyeY: CGFloat) {
         // Watching a film: 3D glasses go on over anything else.
-        if watching == .movie, mood != .sleep { draw3DGlasses(fx: fx, spread: spread, eyeY: eyeY); return }
-        drawScreenReflection(fx: fx, spread: spread, eyeY: eyeY)
+        // 3D glasses for a film go on over anything else; tears and the screen's reflection go with the eyes.
+        if drawActEyes(fx: fx, spread: spread, eyeY: eyeY) { return }
         if outfit == .shades {
             let dark = NSColor(calibratedRed: 0.10, green: 0.10, blue: 0.14, alpha: 1)
             for dx in [CGFloat(-1), 1] {

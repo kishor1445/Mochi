@@ -144,13 +144,15 @@ extension PetView {
         paint(NSBezierPath(ovalIn: NSRect(x: p.x - r, y: p.y - r * 0.85, width: r * 2, height: r * 1.7)), fill, species.outline, 1.6)
     }
 
-    /// Draws in a frame at `origin` that faces the way the pet does: +x is "forward". `angle` tilts it.
-    func local(_ origin: NSPoint, angle: CGFloat = 0, _ draw: () -> Void) {
+    /// Draws in a frame at `origin` that faces the way the pet does: +x is "forward". `angle` tilts it,
+    /// `scale` sizes the prop up or down.
+    func local(_ origin: NSPoint, angle: CGFloat = 0, scale: CGFloat = 1, _ draw: () -> Void) {
         NSGraphicsContext.saveGraphicsState()
         let t = NSAffineTransform()
         t.translateX(by: origin.x, yBy: origin.y)
         if facing < 0 { t.scaleX(by: -1, yBy: 1) }
         t.rotate(byRadians: angle)
+        if scale != 1 { t.scale(by: scale) }
         t.concat()
         draw()
         NSGraphicsContext.restoreGraphicsState()
@@ -174,7 +176,9 @@ extension PetView {
         let attrs: [NSAttributedString.Key: Any] = [.font: NSFont.systemFont(ofSize: size, weight: weight), .foregroundColor: color]
         let str = s as NSString
         let w = str.size(withAttributes: attrs)
-        str.draw(at: NSPoint(x: centred ? p.x - w.width / 2 : p.x, y: p.y - w.height / 2), withAttributes: attrs)
+        // Keep it inside the pet's window, whichever side it floats off to.
+        let left = min(max(centred ? p.x - w.width / 2 : p.x, 1), Self.side - w.width - 1)
+        str.draw(at: NSPoint(x: left, y: p.y - w.height / 2), withAttributes: attrs)
     }
 
     /// Fades in over the first 15% and out over the last 25% of `t` (0…1).

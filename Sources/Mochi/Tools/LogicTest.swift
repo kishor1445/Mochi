@@ -218,6 +218,38 @@ enum LogicTest {
         a.media = .none; a.mediaChanged(from: .movie); a.updateBeat()
         check("when it ends the gear comes off", a.view.watching == .none)
 
+        print("--- Acts ---")
+        for kind in [MediaActivity.music, .podcast, .video, .movie] {
+            check("\(AudioWatcher.name(kind).lowercased()) has five acts", MediaAct.acts(for: kind).count == 5)
+        }
+        check("every act belongs to exactly one kind", MediaAct.allCases.count == 20)
+        var repeats = 0
+        for act in MediaAct.allCases { for _ in 0..<50 where MediaAct.pick(for: act.kind, after: act) == act { repeats += 1 } }
+        check("switching acts never picks the same one again", repeats == 0)
+        var seen = Set<MediaAct>()
+        for _ in 0..<400 { if let p = MediaAct.pick(for: .video) { seen.insert(p) } }
+        check("over time every video act turns up", seen.count == 5)
+        for kind in [MediaActivity.music, .podcast, .video, .movie] {
+            a.media = kind; a.mediaChanged()
+            check("\(AudioWatcher.name(kind).lowercased()) starts one of its own acts", a.view.act?.kind == kind, a.view.act?.label ?? "none")
+        }
+        a.media = .music; a.mediaChanged()
+        let firstAct = a.view.act
+        a.nextActChange = .distantPast
+        a.mediaTick(Date())
+        check("after a few minutes it moves on to another act", a.view.act != firstAct && a.view.act?.kind == .music)
+        a.view.act = .karaoke; a.view.mood = .idle
+        check("singing karaoke it shows the mic, not headphones", a.view.showsAct && !(a.view.act?.wearsHeadphones ?? true))
+        a.view.act = .dj
+        check("DJing it wears headphones", a.view.act?.wearsHeadphones == true)
+        a.view.mood = .walk
+        check("a turntable doesn't come along on a walk", !a.view.showsAct)
+        a.view.act = .rave
+        check("glow sticks do come along on a walk", a.view.showsAct)
+        a.view.mood = .idle
+        a.media = .none; a.mediaChanged()
+        check("when nothing plays there's no act", a.view.act == nil)
+
         var settle = AudioWatcher.Settle()
         let t0 = Date()
         check("music from Now Playing starts within half a second",

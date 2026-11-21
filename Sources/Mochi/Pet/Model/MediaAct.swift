@@ -50,6 +50,32 @@ enum MediaAct: String, CaseIterable, Identifiable {
         }
     }
 
+    /// For the AI: what the pet is up to, finishing "…while ___".
+    var doing: String {
+        switch self {
+        case .dj: return "DJing to the music on a little turntable"
+        case .airGuitar: return "playing air guitar to the music"
+        case .karaoke: return "singing karaoke to the song"
+        case .rave: return "waving glow sticks to the music"
+        case .bongos: return "drumming bongos to the music"
+        case .earbud: return "listening to a podcast with one earbud in"
+        case .notes: return "taking notes on a podcast"
+        case .coffee: return "sipping coffee with a podcast on"
+        case .radio: return "listening to a podcast on a little retro radio"
+        case .thinker: return "thinking hard about what the podcast said"
+        case .phone: return "watching a video on a phone"
+        case .snacks: return "eating chips and watching a video"
+        case .like: return "holding up a thumbs-up sign for a video"
+        case .subscribe: return "pressing subscribe on a video channel"
+        case .comments: return "typing a comment under a video"
+        case .cinema: return "watching a film in 3D glasses with popcorn"
+        case .blanket: return "wrapped in a blanket watching a show"
+        case .soda: return "watching a film with soda and nachos"
+        case .scary: return "hiding behind a cushion during a scary film"
+        case .tearjerker: return "crying at a sad film with tissues"
+        }
+    }
+
     /// Props that stand on the ground (a turntable, a radio, a laptop): only out while the pet stands still.
     /// The rest are held, so they come along on a walk too.
     var staysPut: Bool {

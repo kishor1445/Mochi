@@ -56,31 +56,33 @@ enum Render {
         media(to: path.replacingOccurrences(of: ".png", with: "-media.png"))
     }
 
-    /// One row per kind of thing playing (film, video, podcast, music), across several pets.
-    /// Film cells alternate between holding the popcorn and a piece on its way to the mouth.
+    /// One sheet per kind of media (…-music.png, …-podcast.png, …-video.png, …-movie.png): a row per act,
+    /// a column per pet. Each column is caught at a different moment, so the animations show mid-move.
     static func media(to path: String) {
-        let pets: [Species] = [.mochi, .cat, .bunny, .penguin, .ghost, .dino, .robot, .dragon, .wolf, .shark]
-        let rows: [(MediaGear, CGFloat)] = [(.movie, 0), (.video, 0), (.podcast, 0), (.none, 120)]
+        let pets = Species.allCases
         let cell = PetView.side
-        let sheet = NSImage(size: NSSize(width: cell * CGFloat(pets.count), height: cell * CGFloat(rows.count)))
-        sheet.lockFocus()
-        NSColor(calibratedWhite: 0.93, alpha: 1).setFill()
-        NSRect(origin: .zero, size: sheet.size).fill()
-        for (row, r) in rows.enumerated() {
-            for (col, sp) in pets.enumerated() {
-                let v = PetView(frame: NSRect(origin: .zero, size: PetView.size))
-                v.species = sp; v.mood = .idle; v.facing = 1; v.watching = r.0; v.musicBpm = r.1
-                // Popcorn mid-flight on odd columns; thinking dots on the podcast row's odd columns.
-                v.time = r.0 == .movie ? (col.isMultiple(of: 2) ? 2.0 : 0.35) : (col.isMultiple(of: 2) ? 0.6 : 7.6)
-                let rep = v.bitmapImageRepForCachingDisplay(in: v.bounds)!
-                v.cacheDisplay(in: v.bounds, to: rep)
-                let img = NSImage(size: v.bounds.size); img.addRepresentation(rep)
-                img.draw(at: NSPoint(x: CGFloat(col) * cell, y: sheet.size.height - cell * CGFloat(row + 1)),
-                         from: .zero, operation: .sourceOver, fraction: 1)
+        for kind in [MediaActivity.music, .podcast, .video, .movie] {
+            let acts = MediaAct.acts(for: kind)
+            let sheet = NSImage(size: NSSize(width: cell * CGFloat(pets.count), height: cell * CGFloat(acts.count)))
+            sheet.lockFocus()
+            NSColor(calibratedWhite: 0.93, alpha: 1).setFill()
+            NSRect(origin: .zero, size: sheet.size).fill()
+            for (row, act) in acts.enumerated() {
+                for (col, sp) in pets.enumerated() {
+                    let v = PetView(frame: NSRect(origin: .zero, size: PetView.size))
+                    v.species = sp; v.mood = .idle; v.facing = col.isMultiple(of: 3) ? -1 : 1; v.act = act
+                    v.musicBpm = kind == .music ? 116 : 0
+                    v.time = 0.55 + CGFloat(col) * 0.83 + CGFloat(row) * 0.37
+                    let rep = v.bitmapImageRepForCachingDisplay(in: v.bounds)!
+                    v.cacheDisplay(in: v.bounds, to: rep)
+                    let img = NSImage(size: v.bounds.size); img.addRepresentation(rep)
+                    img.draw(at: NSPoint(x: CGFloat(col) * cell, y: sheet.size.height - cell * CGFloat(row + 1)),
+                             from: .zero, operation: .sourceOver, fraction: 1)
+                }
             }
+            sheet.unlockFocus()
+            write(sheet, to: path.replacingOccurrences(of: "-media.png", with: "-\(kind == .movie ? "movie" : AudioWatcher.name(kind).lowercased()).png"))
         }
-        sheet.unlockFocus()
-        write(sheet, to: path)
     }
 
     private static func write(_ image: NSImage, to path: String) {

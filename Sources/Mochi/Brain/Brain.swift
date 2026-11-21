@@ -123,7 +123,9 @@ final class MindBrain: Brain {
                 // Music doesn't change what it does, only how: it goes about its usual day while vibing
                 // to the beat (PetView draws the groove), and now and then breaks into a proper dance.
                 if ctx.surface == .floor || ctx.surface == .air {
-                    o = [(4, d(.idle, 2, 5)), (10, d(.walk(axis: axis), 2, 7)), (1.5, d(.happy, 1.5, 1.5)),
+                    // With music on it stops to perform (DJ, bongos…) more often, but still walks the most.
+                    let perform = ctx.media == .music
+                    o = [(perform ? 8 : 4, d(.idle, perform ? 4 : 2, perform ? 9 : 5)), (10, d(.walk(axis: axis), 2, 7)), (1.5, d(.happy, 1.5, 1.5)),
                          (2, d(.stretch, 2.4, 2.4)), (1.5, d(.spin, 0.9, 0.9)), (1.5, d(.dance, 4, 4)),
                          (2.5, d(.lookAround, 3, 3)), (1.5, d(.zoomies, 3.5, 3.5)),
                      (1.2, d(.power, 2.2, 2.2)), (1.2, d(.flip, 0.8, 0.8))]

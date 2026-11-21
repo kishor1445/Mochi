@@ -36,7 +36,8 @@ extension PetView {
         let floor = groundY(body)
         let pad = NSPoint(x: body.midX + facing * 7, y: floor)
         var tip = NSPoint.zero
-        local(pad, angle: 0.08) {
+        let s: CGFloat = 1.45
+        local(pad, angle: 0.08, scale: s) {
             let sheet = roundRect(NSRect(x: -11, y: 0, width: 22, height: 15), 1.5)
             paint(sheet, rgb(1, 0.99, 0.94), ink, 1.2)
             rgb(0.55, 0.75, 0.95).setStroke()
@@ -65,8 +66,8 @@ extension PetView {
             tip = NSPoint(x: -6 + 15 * along, y: rowY + 0.9)
         }
         // Pencil and paw, at the end of the scribble.
-        let t = NSPoint(x: pad.x + facing * tip.x, y: pad.y + tip.y + (facing * tip.x) * 0.08)
-        local(t, angle: 1.0) {
+        let t = NSPoint(x: pad.x + facing * tip.x * s, y: pad.y + tip.y * s + tip.x * s * 0.08)
+        local(t, angle: 1.0, scale: 1.3) {
             paint(roundRect(NSRect(x: 2.5, y: -1.4, width: 12, height: 2.8), 0.6), rgb(1, 0.80, 0.25), ink, 0.9)
             paint(roundRect(NSRect(x: 14, y: -1.4, width: 3, height: 2.8), 0.8), rgb(1, 0.6, 0.65), ink, 0.9)
             let point = NSBezierPath(); point.move(to: NSPoint(x: 2.5, y: -1.4)); point.line(to: NSPoint(x: 0, y: 0)); point.line(to: NSPoint(x: 2.5, y: 1.4)); point.close()
@@ -97,9 +98,9 @@ extension PetView {
         // Lift, hold a sip, put it back down.
         var lift: CGFloat = 0
         if let s = moment(every: 7, lasting: 2.4, offset: 2) { lift = s < 0.25 ? s / 0.25 : (s > 0.75 ? (1 - s) / 0.25 : 1) }
-        let sipAt = NSPoint(x: mouth.x + facing * 9, y: mouth.y - 3)
+        let sipAt = NSPoint(x: mouth.x + facing * 11, y: mouth.y - 4)
         let p = NSPoint(x: rest.x + (sipAt.x - rest.x) * lift, y: rest.y + (sipAt.y - rest.y) * lift)
-        local(p, angle: -0.35 * lift) {
+        local(p, angle: -0.35 * lift, scale: 1.45) {
             let handle = NSBezierPath(ovalIn: NSRect(x: 3, y: -4, width: 7, height: 8))
             paint(handle, nil, ink, 3.6)
             paint(handle, nil, rgb(0.30, 0.68, 0.70), 2)
@@ -113,7 +114,7 @@ extension PetView {
         // Steam: two wavy wisps rising and fading.
         for i in 0..<2 {
             let t = fmod(time * 0.5 + CGFloat(i) * 0.5, 1)
-            let x0 = p.x + CGFloat(i * 4 - 2), y0 = p.y + 8 + t * 12
+            let x0 = p.x + CGFloat(i * 5 - 3), y0 = p.y + 11 + t * 12
             let wisp = NSBezierPath(); wisp.move(to: NSPoint(x: x0, y: y0))
             wisp.curve(to: NSPoint(x: x0, y: y0 + 8), controlPoint1: NSPoint(x: x0 + 3, y: y0 + 2.6), controlPoint2: NSPoint(x: x0 - 3, y: y0 + 5.4))
             wisp.lineWidth = 1.3; wisp.lineCapStyle = .round
@@ -126,8 +127,8 @@ extension PetView {
     /// A little vintage radio beside it, sound waves coming out; the pet leans in to listen (`actSway`).
     func drawRadio(_ body: NSRect) {
         let floor = groundY(body)
-        let base = NSPoint(x: body.midX + facing * (body.width / 2 - 6), y: floor)
-        local(base) {
+        let base = NSPoint(x: body.midX + facing * (body.width / 2 - 13), y: floor)
+        local(base, scale: 1.3) {
             // Antenna and handle first, behind the case.
             ink.setStroke()
             let antenna = NSBezierPath(); antenna.move(to: NSPoint(x: 5, y: 15)); antenna.line(to: NSPoint(x: 13, y: 29)); antenna.lineWidth = 1.2; antenna.stroke()
@@ -153,42 +154,50 @@ extension PetView {
             // Sound waves going out away from the pet.
             for i in 0..<3 {
                 let t = fmod(time * 0.8 + CGFloat(i) / 3, 1)
-                let r = 5 + t * 11
+                let r = 4 + t * 8
                 let wave = NSBezierPath()
                 wave.appendArc(withCenter: NSPoint(x: 13, y: 8), radius: r, startAngle: -35, endAngle: 35)
                 wave.lineWidth = 1.3; wave.lineCapStyle = .round
                 rgb(0.86, 0.38, 0.26, (1 - t) * 0.8).setStroke(); wave.stroke()
             }
         }
-        paw(NSPoint(x: base.x - facing * 10, y: floor + 12))
+        paw(NSPoint(x: base.x - facing * 13, y: floor + 15))
     }
 
     // MARK: Deep thinker
 
-    /// Paw on chin; above its head a "?" forms, turns over for a moment, then becomes a "!".
+    /// Paw on chin; beside its head a thought cloud: a "?" for a while, a few dots, then a bright "!".
     func drawThinker(_ body: NSRect) {
         let mouth = mouthPoint(body)
-        paw(NSPoint(x: mouth.x + facing * 3, y: mouth.y - 6.5), 4.4)
-        let spot = NSPoint(x: body.midX + facing * 15, y: body.maxY + 10)
+        paw(NSPoint(x: mouth.x + facing * 7, y: mouth.y - 7), 5.2)
+
+        // The cloud, beside the head (kept inside the pet's window), with two little puffs leading up to it.
+        let c = NSPoint(x: min(max(body.midX + facing * (body.width / 2 - 4), 15), Self.side - 15), y: min(body.maxY + 6, Self.side - 13))
         let t = fmod(time, 8)
-        if t < 3.4 {
-            let grow = min(1, t / 0.5)
-            label("?", at: NSPoint(x: spot.x, y: spot.y + sin(time * 2) * 1.5), size: 10 + 4 * grow, color: rgb(0.45, 0.50, 0.75, min(1, (3.4 - t) * 3)))
-        } else if t < 5.2 {
+        let appear = min(1, t / 0.4)
+        guard appear > 0 else { return }
+        let bubble = NSColor.white.withAlphaComponent(0.95 * appear)
+        let edge = rgb(0.55, 0.55, 0.65, appear)
+        paint(circle(NSPoint(x: c.x - facing * 9, y: c.y - 10), 1.6), bubble, edge, 0.9)
+        paint(circle(NSPoint(x: c.x - facing * 6, y: c.y - 6.5), 2.4), bubble, edge, 0.9)
+        let cloud = NSBezierPath()
+        for (dx, dy, r) in [(CGFloat(-6), CGFloat(0), CGFloat(6)), (0, 3, 7), (6, 0, 6), (0, -2.5, 6.5)] {
+            cloud.append(circle(NSPoint(x: c.x + dx, y: c.y + dy), r))
+        }
+        cloud.windingRule = .nonZero
+        edge.setStroke(); cloud.lineWidth = 1.8; cloud.stroke()
+        bubble.setFill(); cloud.fill()
+
+        if t < 3.6 {
+            label("?", at: NSPoint(x: c.x, y: c.y + 0.5 + sin(time * 2) * 0.8), size: 11, color: rgb(0.40, 0.45, 0.75, appear))
+        } else if t < 5.4 {
             for i in 0..<3 {
                 let on = fmod(time * 3 + CGFloat(i) * 0.33, 1) > 0.5
-                paint(circle(NSPoint(x: spot.x - 5 + CGFloat(i) * 5, y: spot.y - 2), 1.5), NSColor(calibratedWhite: 0.5, alpha: on ? 0.9 : 0.35))
+                paint(circle(NSPoint(x: c.x - 5 + CGFloat(i) * 5, y: c.y), 1.5), NSColor(calibratedWhite: 0.45, alpha: on ? 0.9 : 0.3))
             }
-        } else if t < 7.4 {
-            let pop = min(1, (t - 5.2) / 0.25)
-            label("!", at: NSPoint(x: spot.x, y: spot.y + 1), size: 9 + 6 * pop, color: rgb(1, 0.55, 0.15, min(1, (7.4 - t) * 3)))
-            for i in 0..<4 {
-                let a = CGFloat(i) * .pi / 6 + .pi / 4
-                let ray = NSBezierPath()
-                ray.move(to: NSPoint(x: spot.x + cos(a) * 8, y: spot.y + sin(a) * 8))
-                ray.line(to: NSPoint(x: spot.x + cos(a) * (10 + pop * 2), y: spot.y + sin(a) * (10 + pop * 2)))
-                ray.lineWidth = 1.2; ray.lineCapStyle = .round; rgb(1, 0.55, 0.15, 0.8).setStroke(); ray.stroke()
-            }
+        } else {
+            let pop = min(1, (t - 5.4) / 0.25)
+            label("!", at: NSPoint(x: c.x, y: c.y + 0.5), size: 8 + 4 * pop, color: rgb(1, 0.55, 0.15))
         }
     }
 }
