@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Music detection rewritten: the pet now goes by the system's Now Playing (the media controls in Control Center) instead of guessing from which apps have the speakers open. It vibes to Spotify, Apple Music, YouTube or any site in a browser and other players as soon as they play, and stops within a second of pausing. Dictating (Wispr Flow, Superwhisper…), chat apps and idle browser tabs no longer set it off, and a dance stops when the music does. Calls are still recognised from a chat app using the microphone, and if Now Playing can't be read the old detection takes over. No new permission is needed. `Mochi --audio-test [seconds]` shows what Now Playing reports
 - Music: the pet no longer drops everything to dance when Spotify, Apple Music or another player starts. It keeps walking, climbing and exploring as usual while vibing to the beat: footsteps in time with the music, a side-to-side groove, foot taps and waving arms when it stands still, and a few seconds with its eyes closed, lost in the song. It still breaks into a proper dance now and then. Music playing during a call (for example Spotify while you sit in a Discord voice channel) gets the vibe too; the pet just stays quiet for the call
 
 - AI (optional): connect any OpenAI-compatible server in Settings › AI, local (Ollama, LM Studio, llama.cpp) or hosted. The API key is kept in the keychain, and the pet falls back to its built-in lines and behaviour whenever the server is off or slow

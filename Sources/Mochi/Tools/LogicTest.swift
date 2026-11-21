@@ -141,6 +141,41 @@ enum LogicTest {
         a.media = .none
         a.mediaChanged()
 
+        // MARK: Now Playing
+        print("--- Now Playing ---")
+        let w = AudioWatcher.shared
+        func np(_ playing: Bool, _ app: String?, video: Bool = false) -> NowPlaying.State {
+            NowPlaying.State(playing: playing, app: app, name: nil, title: nil, video: video)
+        }
+        check("Spotify playing is music", w.kind(of: np(true, "com.spotify.client")) == .music)
+        check("Spotify paused is nothing", w.kind(of: np(false, "com.spotify.client")) == nil)
+        check("YouTube in a browser is music to vibe to", w.kind(of: np(true, "com.google.Chrome")) == .music)
+        check("a player that says it shows a video is a video", w.kind(of: np(true, "com.google.Chrome", video: true)) == .video)
+        check("IINA playing is a video", w.kind(of: np(true, "com.colliderli.iina")) == .video)
+        check("helper reports are read", NowPlaying.state(from: ["playing": true, "app": "com.spotify.client", "type": 1])
+              == np(true, "com.spotify.client"))
+
+        var settle = AudioWatcher.Settle()
+        let t0 = Date()
+        check("music from Now Playing starts within half a second",
+              settle.feed(.music, exact: true, now: t0) != nil && settle.feed(.music, exact: true, now: t0 + 0.35) == nil && settle.value == .music)
+        _ = settle.feed(.none, exact: true, now: t0 + 1)
+        check("…and stops within a second of pausing", settle.feed(.none, exact: true, now: t0 + 1.65) == nil && settle.value == .none)
+        _ = settle.feed(.music, exact: true, now: t0 + 2)
+        _ = settle.feed(.music, exact: true, now: t0 + 2.4)
+        _ = settle.feed(.none, exact: true, now: t0 + 3)
+        check("the gap between two songs doesn't end the vibe", settle.feed(.music, exact: true, now: t0 + 3.3) == nil && settle.value == .music)
+        var fallback = AudioWatcher.Settle()
+        check("sound only seen in the speaker list still waits a few seconds",
+              fallback.feed(.other, exact: false, now: t0) != nil && fallback.feed(.other, exact: false, now: t0 + 1) != nil
+              && fallback.feed(.other, exact: false, now: t0 + 3.1) == nil && fallback.value == .other)
+        check("a call still takes a few seconds to count", AudioWatcher.delay(from: .music, to: .call, exact: true) >= 3)
+
+        a.apply(Decision(action: .dance, duration: 6))
+        a.media = .music; a.mediaChanged()
+        a.media = .none; a.mediaChanged()
+        check("a dance stops when the music does", a.remaining <= 0.4, String(format: "%.1fs left", a.remaining))
+
         // MARK: Two pets
         print("--- Two pets ---")
         let b = PetController(isMain: false)

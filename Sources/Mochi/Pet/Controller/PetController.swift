@@ -178,6 +178,12 @@ final class PetController {
         window.contentView = view
         window.isReleasedWhenClosed = false
 
+        // Music starting or stopping reaches the pet at once, not at its next once-a-second look around.
+        NotificationCenter.default.addObserver(forName: .mochiMediaChanged, object: nil, queue: .main) { [weak self] _ in
+            guard let self, self.timer != nil else { return }
+            self.refreshMedia()
+        }
+
         // Swiping between Spaces shuffles every window's position: pause window tracking until it settles.
         NSWorkspace.shared.notificationCenter.addObserver(
             forName: NSWorkspace.activeSpaceDidChangeNotification, object: nil, queue: .main

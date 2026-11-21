@@ -81,10 +81,10 @@ keystrokes, your screen or your calendar.
 - **Several displays**: hops across to the next display, follows your cursor there, and can be dragged anywhere
 
 **Reacts to what is happening on your Mac** (no special permissions)
-- **Music** (Spotify, Apple Music, ...): puts on headphones and vibes along while it carries on as usual: it walks in step with the beat, grooves side to side, taps its feet, sometimes closes its eyes to enjoy the song, and now and then breaks into a proper dance. Only while music is actually playing (a paused Spotify doesn't count; it learns the state at the next play, pause or track change)
+- **Music** (Spotify, Apple Music, YouTube or any site in a browser, ...): puts on headphones and vibes along while it carries on as usual: it walks in step with the beat, grooves side to side, taps its feet, sometimes closes its eyes to enjoy the song, and now and then breaks into a proper dance. It goes by what your Mac shows as Now Playing (the media controls in Control Center), so it starts within a moment of you pressing play, stops within a second of pausing, and isn't fooled by apps that just keep the speakers open, like dictation tools or an idle browser tab
 - **Videos** (QuickTime, VLC, IINA, ...): settles down to watch ("Movie time! 🍿")
 - **Calls** (Zoom, Teams, FaceTime, Discord, ...): goes quiet and still
-- **Anything else making sound** (browsers, etc.): bobs along and sometimes dances
+- **Anything else making sound** (games, etc.): only if your Mac can't report Now Playing and you switch on "React to other audio"
 - **Typing**: bops along with every key you press and cheers when you're on a roll or typing fast. It only reads the system's running count of key presses, never which keys
 - Falls asleep when you step away, and welcomes you back when you return
 - **Busy Mac**: sweats when the processor is flat out or the Mac runs hot, and shivers when the battery is nearly empty
@@ -192,7 +192,8 @@ Sources/Mochi
 │   └── PetMemory.swift            remembered facts and the diary (Application Support/Mochi)
 ├── System/
 │   ├── Platform.swift             finds window tops to stand on
-│   ├── AudioWatcher.swift         which apps are playing sound (music / video / call)
+│   ├── AudioWatcher.swift         what kind of sound is playing (music / video / call)
+│   ├── NowPlaying.swift           what the system's Now Playing says is playing, and whether it's paused
 │   ├── SystemInfo.swift           idle time, battery, processor load, key press count
 │   └── CalendarWatcher.swift      upcoming events (only if calendar alerts are on)
 ├── Features/

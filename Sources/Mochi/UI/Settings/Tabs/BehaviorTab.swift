@@ -16,14 +16,14 @@ struct BehaviorTab: View {
 
             CardSection(title: "Sound and calls") {
                 ToggleRow(symbol: "music.note", tint: .pink, title: "React to media",
-                          subtitle: "Dance to music and settle down for videos or calls.", isOn: $settings.reactToMedia)
+                          subtitle: "Vibe to whatever is playing (Spotify, Music, YouTube in a browser…) and settle down for videos or calls.", isOn: $settings.reactToMedia)
                 RowDivider()
                 ToggleRow(symbol: "mic.fill", tint: .teal, title: "Stay quiet during calls",
                           subtitle: "Pause speech bubbles while a calling app uses your microphone.",
                           isOn: $settings.quietOnCalls)
                 RowDivider()
                 ToggleRow(symbol: "waveform", tint: .purple, title: "React to other audio",
-                          subtitle: "Include browsers and games. Some apps keep audio active while silent.",
+                          subtitle: "Only if your Mac can't report what's playing: count any app with the speakers open, like games. Some apps keep them open while silent.",
                           isOn: $settings.reactToOtherAudio)
             }
 

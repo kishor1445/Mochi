@@ -21,13 +21,7 @@ extension PetController {
             if let end = focusEnds, now >= end { finishFocus() }
         }
 
-        // What's playing?
-        var m = settings.reactToMedia ? audio.current : .none
-        // "Other" just means some app has the speakers open, which is often silence: opt-in only.
-        if m == .other, !settings.reactToOtherAudio { m = .none }
-        if m == .call, !settings.quietOnCalls { m = .none }
-        if m != media { media = m; mediaChanged() }
-        updateBeat()
+        refreshMedia()
 
         // Is anyone there?
         let idle = SystemInfo.userIdleSeconds()
@@ -54,6 +48,17 @@ extension PetController {
 
         if settings.systemAware { checkHour(); checkBattery(now); checkLoad(now) }
         else { view.sweat = false; view.shiver = false }
+    }
+
+    /// What's playing, as far as the settings let the pet care. Runs every second, and straight away
+    /// whenever the audio watcher notices a change.
+    func refreshMedia() {
+        var m = settings.reactToMedia ? audio.current : .none
+        // "Other" just means some app has the speakers open, which is often silence: opt-in only.
+        if m == .other, !settings.reactToOtherAudio { m = .none }
+        if m == .call, !settings.quietOnCalls { m = .none }
+        if m != media { media = m; mediaChanged() }
+        updateBeat()
     }
 
     func mediaChanged() {
@@ -92,6 +97,8 @@ extension PetController {
             view.musicBpm = .random(in: 100...126)
         } else {
             view.musicBpm = 0
+            // A dance that started to the music ends with it, instead of playing out its last few seconds.
+            if action == .dance, social == .none { remaining = min(remaining, 0.4) }
             if isMain, media == .none { react("The music you were vibing to just stopped", fallback: "Aww, the music stopped 🥲") }
         }
     }
