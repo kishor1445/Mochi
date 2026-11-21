@@ -17,7 +17,7 @@ final class LLMBrain: Brain {
         guard ai.on(.brain) else { return base.nextDecision(ctx) }
 
         // Moments when the pet must stay calm or asleep belong to the built-in rules.
-        let handsOff = ctx.userAway || ctx.focusing || ctx.media == .call || ctx.media == .movie || ctx.energy < 0.08
+        let handsOff = ctx.userAway || ctx.focusing || ctx.onCall || ctx.media == .movie || ctx.energy < 0.08
         let now = Date()
         if let i = idea {
             idea = nil

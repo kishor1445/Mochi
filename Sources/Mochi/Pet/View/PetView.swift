@@ -24,7 +24,7 @@ final class PetView: NSView {
     var spin: CGFloat = 0                // extra twirl / wobble around the pet's own centre
     var gaze: CGPoint = .zero            // where the eyes look (local coordinates)
     var musicBpm: CGFloat = 0            // > 0 while music plays: headphones + bobbing to the beat
-    var watching: MediaGear = .none      // a podcast, video or film is on: earbud, screen glow, 3D glasses (PetView+Media)
+    var act: MediaAct?                   // what it's doing while something plays: DJing, binge-watching… (View/Acts)
     var outfit: Outfit = .none           // what the pet is wearing
     var sweat = false                    // the Mac is working hard
     var shiver = false                   // the battery is nearly empty
@@ -56,7 +56,11 @@ final class PetView: NSView {
     var beatPhase: CGFloat { time * .pi * musicBpm / 60 }
 
     /// Every so often a vibing pet closes its eyes and gets lost in the song for a few seconds.
-    var lostInMusic: Bool { vibing && mood != .sad && fmod(time, 9) > 6 }
+    /// Singing karaoke, it closes them for the big notes.
+    var lostInMusic: Bool {
+        if act == .karaoke, showsAct, mood == .idle { return fmod(time, 5) > 2.6 }
+        return vibing && mood != .sad && fmod(time, 9) > 6
+    }
 
     override var isFlipped: Bool { false }
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }

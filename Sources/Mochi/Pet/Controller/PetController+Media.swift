@@ -7,7 +7,7 @@ import AppKit
 /// - podcast: one earbud in, nodding along, the odd "mm-hmm"
 /// - video: sits down to watch in the screen's glow, giggles now and then
 /// - film or show: 3D glasses and popcorn, quiet and still until it ends
-/// - call: quiet (see `canSpeak`)
+/// A call is separate (`onCall`): the pet keeps quiet, but still watches or listens along with you.
 extension PetController {
     /// What's playing, as far as the settings let the pet care. Runs every second, and straight away
     /// whenever the audio watcher notices a change.
@@ -15,7 +15,11 @@ extension PetController {
         var m = settings.reactToMedia ? audio.current : .none
         // "Other" just means some app has the speakers open, which is often silence: opt-in only.
         if m == .other, !settings.reactToOtherAudio { m = .none }
-        if m == .call, !settings.quietOnCalls { m = .none }
+        let call = settings.quietOnCalls && audio.onCall
+        if call != onCall {
+            onCall = call
+            callChanged()
+        }
         if m != media {
             let before = media
             media = m
@@ -57,12 +61,19 @@ extension PetController {
                               fallback: Dialogue.movieStart.randomElement()!, force: true, note: true) }
             if canAct, !userAway { apply(Decision(action: .idle, duration: 6)) }
         case .call:
-            if isMain { say("Shh… I'll be quiet 🤫", force: true) }
-            if canAct, !userAway { apply(Decision(action: .idle, duration: 5)) }
+            break                                   // never set: calls are `onCall`
         case .none:
             if isMain, before == .movie { react("The film or show you were watching together just ended", fallback: Dialogue.movieEnd.randomElement()!) }
         }
         updateBeat()
+    }
+
+    /// A call started or ended. The pet goes quiet, and stops whatever it was doing to listen; anything
+    /// playing carries on as before (gear, vibing), just silently.
+    func callChanged() {
+        guard onCall else { return }
+        if isMain { say("Shh… I'll be quiet 🤫", force: true) }
+        if canAct, !userAway, !media.isWatching { apply(Decision(action: .idle, duration: 5)) }
     }
 
     /// " (“Song” by Artist in Spotify)": what the model is told about the item, when known.
@@ -102,12 +113,9 @@ extension PetController {
         }
     }
 
-    /// Whether the pet should be vibing: headphones on and grooving to the beat.
-    /// Music counts even during a call (say, a Discord voice channel with Spotify playing): the vibe is
-    /// only visual, and the pet still keeps quiet for the call.
-    var hearsMusic: Bool {
-        media == .music || media == .other || (settings.reactToMedia && audio.musicOn && !media.isWatching && media != .podcast)
-    }
+    /// Whether the pet should be vibing: headphones on and grooving to the beat. During a call too
+    /// (say, a Discord voice channel with Spotify playing): the vibe is only visual, and the pet stays quiet.
+    var hearsMusic: Bool { media == .music || media == .other }
 
     /// Puts the right things on for what's playing: headphones for music; an earbud, the screen's glow
     /// or 3D glasses and popcorn for the rest.

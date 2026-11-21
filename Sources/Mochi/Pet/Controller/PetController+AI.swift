@@ -18,10 +18,11 @@ extension PetController {
         case .podcast: parts.append("Your human is listening to a podcast\(describe(audio.playingNow)).")
         case .video: parts.append("Your human is watching a video\(describe(audio.playingNow)).")
         case .movie: parts.append("Your human is watching a film or show\(describe(audio.playingNow)); you are watching too, in 3D glasses with popcorn.")
-        case .call: parts.append("Your human is on a call.")
+        case .call: break
         case .other: parts.append("Some sound is playing\(soundSource).")
         case .none: break
         }
+        if onCall { parts.append("Your human is on a call.") }
         if focusing { parts.append("A focus session is running.") }
         return parts.joined(separator: " ")
     }

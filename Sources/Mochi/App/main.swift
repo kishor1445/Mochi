@@ -63,11 +63,11 @@ if args.contains("--audio-test") {
     let began = Date()
     func stamp() -> String { String(format: "%5.1fs", Date().timeIntervalSince(began)) }
     var last: MediaActivity? = nil
-    var lastMusic: Bool? = nil
+    var lastCall: Bool? = nil
     var lastSources: [String] = []
     NotificationCenter.default.addObserver(forName: .mochiMediaChanged, object: nil, queue: .main) { _ in
         if w.current != last { last = w.current; print(stamp(), "media:", AudioWatcher.name(w.current)) }
-        if w.musicOn != lastMusic { lastMusic = w.musicOn; print(stamp(), "music playing (vibe):", w.musicOn ? "yes" : "no") }
+        if w.onCall != lastCall { lastCall = w.onCall; print(stamp(), "on a call:", w.onCall ? "yes" : "no") }
     }
     let t = Timer(timeInterval: 0.25, repeats: true) { _ in
         if w.sources != lastSources { lastSources = w.sources; print(stamp(), "  heard:", w.sources.isEmpty ? "nothing" : w.sources.joined(separator: "; ")) }

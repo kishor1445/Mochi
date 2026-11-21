@@ -44,6 +44,7 @@ struct PetContext {
     let canClimb: Bool                 // on the Dock floor with climbing enabled
     let canHide: Bool                  // on the Dock floor with a screen edge to duck behind
     let media: MediaActivity           // what is playing on the Mac
+    var onCall = false                 // a call is on: keep quiet
     let userAway: Bool                 // nobody has touched the Mac for a while
     let focusing: Bool                 // a focus session is running: keep calm
     let species: Species
@@ -75,7 +76,9 @@ final class MindBrain: Brain {
         let hungry = ctx.fullness < 0.2
         let lonely = ctx.joy < 0.25
         let joyful = ctx.joy > 0.7
-        let quiet = ctx.media == .call || ctx.focusing
+        // On a call it keeps quiet, but if something is on screen it still watches along (the watching
+        // branches below are calm and still anyway).
+        let quiet = ctx.focusing || (ctx.onCall && !ctx.media.isWatching)
 
         // Running on empty: nothing else matters until it has had a nap.
         if ctx.energy < 0.08 {

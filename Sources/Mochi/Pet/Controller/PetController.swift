@@ -113,7 +113,8 @@ final class PetController {
     var lastClick = Date.distantPast
 
     // Awareness
-    var media: MediaActivity = .none
+    var media: MediaActivity = .none        // what's playing, as far as the settings let the pet care
+    var onCall = false                      // a call is on (and "Stay quiet during calls" is on): keep quiet
     var playingTitle: String?               // the song or show last reacted to, so a new one is noticed
     var nextMediaMoment = Date.distantFuture   // the next little reaction to a podcast or video
     var userAway = false

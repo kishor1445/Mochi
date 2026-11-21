@@ -43,16 +43,16 @@ enum LogicTest {
         check("starts over after a 15 minute break", a.reminderElapsed[.water] == nil)
 
         said = a.saidCount
-        a.media = .call
+        a.onCall = true
         pass(700, idle: 2)
         check("held back during a call", a.saidCount == said && (a.reminderElapsed[.water] ?? 0) >= 600)
-        a.media = .none
+        a.onCall = false
         pass(2, idle: 2)
         check("fires as soon as the call ends", a.saidCount == said + 1)
-        a.reminderElapsed = [:]; a.media = .call; said = a.saidCount
+        a.reminderElapsed = [:]; a.onCall = true; said = a.saidCount
         pass(905, idle: 2)
         check("a call only delays it by 5 minutes", a.saidCount == said + 1)
-        a.media = .none
+        a.onCall = false
 
         s.reminderMinutes = [ReminderKind.water.rawValue: 10, ReminderKind.posture.rawValue: 10, ReminderKind.eyes.rawValue: 10]
         a.reminderElapsed = [:]
@@ -128,16 +128,30 @@ enum LogicTest {
         a.mediaChanged()
         check("music stopping ends the vibe", !a.view.vibing && a.view.musicBpm == 0)
 
-        // Spotify playing while a Discord voice channel holds the mic: the call wins `current`, but it's still music.
-        AudioWatcher.shared.musicOn = true
-        a.media = .call
+        // Spotify playing while a Discord voice channel holds the mic: still music, just a quiet pet.
+        a.onCall = true
+        a.media = .music
         a.mediaChanged()
         a.view.mood = .idle
         check("music during a call (e.g. a Discord voice channel) still gets the vibe", a.view.vibing && a.view.musicBpm > 0)
         check("…while the pet stays quiet for the call", !a.canSpeak(force: false))
-        AudioWatcher.shared.musicOn = false
-        a.updateBeat()
+        a.media = .none
+        a.mediaChanged()
         check("the vibe ends when that music stops", a.view.musicBpm == 0)
+        // The bug: a YouTube video with Discord holding the mic showed nothing, because the call hid the video.
+        a.media = .video
+        a.mediaChanged()
+        check("a video during a call is still watched (screen glow on)", a.view.watching == .video)
+        a.media = .movie
+        a.mediaChanged()
+        check("a film during a call still gets the 3D glasses", a.view.watching == .movie)
+        let callFilm = PetContext(surface: .floor, axisFraction: 0.5, cursorDistance: 900, secondsSinceInteraction: 60, hour: 20,
+                                  platformAbove: false, canClimb: false, canHide: false, media: .movie, onCall: true, userAway: false,
+                                  focusing: false, species: a.species, energy: 0.8, fullness: 0.8, joy: 0.8, bondLevel: 3)
+        var watchingOnCall = 0
+        for _ in 0..<500 { if case .idle = brain.nextDecision(callFilm).action { watchingOnCall += 1 } }
+        check("…and it sits still watching rather than pottering about", watchingOnCall > 400, "\(watchingOnCall / 5)% idle")
+        a.onCall = false
         a.media = .none
         a.mediaChanged()
 

@@ -8,7 +8,7 @@ enum MediaActivity: Equatable {
     case podcast    // a podcast or an audiobook
     case video      // YouTube and other clips
     case movie      // a film or a show: Netflix, Prime Video, the TV app, IINA…
-    case call       // Zoom, Teams, FaceTime, Discord, ...
+    case call       // Zoom, Teams, FaceTime, Discord: only inside the watcher, reported as `onCall`
     case other      // an app with the speakers open (only when Now Playing can't be read)
 
     /// Something with pictures that the pet sits down to watch.
@@ -16,7 +16,7 @@ enum MediaActivity: Equatable {
 }
 
 extension Notification.Name {
-    /// Posted by `AudioWatcher` when `current` or `musicOn` changes, so the pets react at once.
+    /// Posted by `AudioWatcher` when `current` or `onCall` changes, so the pets react at once.
     static let mochiMediaChanged = Notification.Name("MochiMediaChanged")
 }
 
@@ -31,13 +31,12 @@ final class AudioWatcher {
     /// One watcher for the whole app, however many pets are on screen.
     static let shared = AudioWatcher()
     private var started = false
+    /// What is playing (music, a podcast, a video, a film…), whether or not you are also on a call.
     private(set) var current: MediaActivity = .none
+    /// A chat app is using the microphone (Zoom, Discord, FaceTime…). Kept apart from `current`, so a
+    /// YouTube video watched while sitting in a Discord voice channel is still a video, just a quiet one.
+    private(set) var onCall = false
     private var timer: Timer?
-
-    /// A player is playing music, whatever else is going on. `current` reports only the loudest kind
-    /// of sound (a call beats music), but sitting in a Discord voice channel with Spotify on is still
-    /// music to vibe to. Debounced like `current`. Settable so the logic test can fake it.
-    var musicOn = false
 
     /// Real play/pause state for apps that keep their audio stream open while paused (Spotify, Music),
     /// for when Now Playing can't be read. They announce changes system-wide, which needs no permission.
@@ -120,7 +119,7 @@ final class AudioWatcher {
     }
 
     private var settleCurrent = Settle()
-    private var settleMusic = Settle()
+    private var settleCall = Settle()
     private var recheck: DispatchWorkItem?
     private var lastFound = Set<MediaActivity>()
 
@@ -128,23 +127,25 @@ final class AudioWatcher {
     private func poll(fresh: Bool = true) {
         if fresh { lastFound = detect() }
         let exact = nowPlaying.state != nil
-        let before = (current, musicOn)
+        let before = (current, onCall)
         let wait1 = settleCurrent.feed(Self.loudest(lastFound), exact: exact)
-        let wait2 = settleMusic.feed(lastFound.contains(.music) ? .music : .none, exact: exact)
+        // Calls are only ever seen in the process list, so they always take a few seconds to settle.
+        let wait2 = settleCall.feed(lastFound.contains(.call) ? .call : .none, exact: false)
         current = settleCurrent.value
-        musicOn = settleMusic.value == .music
+        onCall = settleCall.value == .call
         if let wait = [wait1, wait2].compactMap({ $0 }).min() {
             recheck?.cancel()
             let work = DispatchWorkItem { [weak self] in self?.poll(fresh: false) }
             recheck = work
             DispatchQueue.main.asyncAfter(deadline: .now() + wait + 0.02, execute: work)
         }
-        if before != (current, musicOn) { NotificationCenter.default.post(name: .mochiMediaChanged, object: self) }
+        if before != (current, onCall) { NotificationCenter.default.post(name: .mochiMediaChanged, object: self) }
     }
 
-    /// Calls beat whatever is playing, which beats an app that merely has the speakers open.
+    /// What's playing, if several things are: music, then talk, then pictures, then an app that merely has
+    /// the speakers open. (A call isn't something playing: see `onCall`.)
     private static func loudest(_ found: Set<MediaActivity>) -> MediaActivity {
-        for kind in [MediaActivity.call, .music, .podcast, .movie, .video, .other] where found.contains(kind) { return kind }
+        for kind in [MediaActivity.music, .podcast, .movie, .video, .other] where found.contains(kind) { return kind }
         return .none
     }
 
@@ -163,7 +164,7 @@ final class AudioWatcher {
 
     /// The Now Playing item behind `current`, while something is playing: the app, title and artist.
     var playingNow: NowPlaying.State? {
-        guard let np = nowPlaying.state, np.playing, current != .none, current != .call, current != .other else { return nil }
+        guard let np = nowPlaying.state, np.playing, current != .none, current != .other else { return nil }
         return np
     }
 

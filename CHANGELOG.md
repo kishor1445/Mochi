@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Fixed: with Discord (or any chat app) holding the microphone, for example sitting in a voice channel, YouTube, films and podcasts got no reaction at all, because the call hid whatever was playing. A call is now kept apart from what's playing: the pet keeps quiet for the call but still watches, listens or vibes along, with the right gear on. `Mochi --audio-test` shows "on a call" separately
 - Reacts to what is playing, not just whether something is: music (headphones, vibing, a dance now and then, remarks about the song), podcasts and audiobooks (one earbud in, nodding along, thinking dots, the odd "Mm-hmm 🤔"), films and shows (3D glasses and a bucket of popcorn it munches from, the screen's light flickering on it, quiet and still until the end, then "That was a good one 🎬"), and videos such as YouTube (the screen's glow and its reflection in the pet's eyes, a giggle now and then). It tells them apart from the app, the title, the channel or artist, the album and the length, with no new permission
 - With AI on, remarks name the song, podcast, video or film and its artist or channel, the next song is noticed now and then, and the model knows to keep calm during podcasts and films
 - During a film the pet no longer jumps onto windows, climbs the edges or hides

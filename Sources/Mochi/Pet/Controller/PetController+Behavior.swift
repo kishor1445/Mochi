@@ -109,7 +109,7 @@ extension PetController {
         guard now >= nextGreeting else { return }
         scheduleGreeting(now)
         if social != .none { return }               // busy with the other pet
-        if settings.chattiness != .off, action != .sleep, !bubble.visible, media != .call, !media.isWatching, !userAway, !focusing {
+        if settings.chattiness != .off, action != .sleep, !bubble.visible, !onCall, !media.isWatching, !userAway, !focusing {
             apply(Decision(action: .greet, duration: 2.2))
         }
     }
@@ -118,7 +118,7 @@ extension PetController {
     func canSpeak(force: Bool) -> Bool {
         if force { return true }
         // Quiet during calls, films and focus sessions.
-        return settings.chattiness != .off && media != .call && media != .movie && !focusing
+        return settings.chattiness != .off && !onCall && media != .movie && !focusing
     }
 
     func say(_ text: String, force: Bool = false, seconds: TimeInterval = 3.6) {
@@ -207,6 +207,7 @@ extension PetController {
                           canClimb: surface == .floor && platform.id == 0 && settings.climbEdges,
                           canHide: surface == .floor && platform.id == 0 && NSScreen.screens.count == 1,
                           media: media,
+                          onCall: onCall,
                           userAway: userAway,
                           focusing: focusing,
                           species: species,

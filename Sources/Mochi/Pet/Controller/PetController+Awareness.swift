@@ -122,7 +122,7 @@ extension PetController {
 
     /// Why reminders are being held back right now (nil = nothing in the way).
     var remindersBlocked: String? {
-        if media == .call { return "you're on a call" }
+        if onCall { return "you're on a call" }
         if focusEnds != nil { return "a focus session is running" }
         if userAway { return "you're away" }
         return nil
@@ -132,7 +132,7 @@ extension PetController {
     /// too, but only five minutes: a bubble is silent, and some people sit in a voice channel for hours.
     func mayRemind(overdue: TimeInterval) -> Bool {
         guard overdue >= 0, focusEnds == nil, !userAway else { return false }
-        return media != .call || overdue >= 300
+        return !onCall || overdue >= 300
     }
 
     /// Each reminder counts the time you are at your Mac. Reading or watching without touching anything
